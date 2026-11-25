@@ -196,13 +196,18 @@ function buildBridge(scene, m, mark) {
   box(carriage, m.aluminum, 0.113, 0.185, 0.021, 0.048, 1.154, 0.252, 0.006);
   box(carriage, m.white, 0.147, 0.020, 0.068, 0.045, 1.227, 0.227, 0.003);
 
-  const ram = group(carriage);
-  box(ram, m.white, 0.172, 1.326, 0.168, 0, 0.991, 0, 0.013);
-  box(ram, m.edge, 0.006, 1.248, 0.112, 0.085, 1.007, 0, 0.003);
-  box(ram, m.aluminum, 0.007, 1.239, 0.033, 0.089, 0.994, 0.022, 0.002);
-  for (let i = 0; i < 4; i++) box(ram, m.edge, 0.035, 0.005, 0.001, -0.053, 1.585 - i * 0.012, 0.0845);
-  decal(ram, mark, 0.061, 0.061, 0.032, 1.076, 0.086);
-  cylinder(ram, m.ceramic, 0.034, 0.206, 0, 0.299, 0, 24);
+  const ramOffset = frame.ramLead / 1000;
+  const housing = group(carriage, 0, 1.421, ramOffset);
+  box(housing, m.white, 0.208, 0.893, 0.204, 0, 0.433, 0.007, 0.016);
+  box(housing, m.edge, 0.004, 0.805, 0.121, 0.103, 0.440, 0.005, 0.002);
+  box(housing, m.aluminum, 0.003, 0.789, 0.030, 0.106, 0.442, 0.032, 0.001);
+  for (let i = 0; i < 4; i++) box(housing, m.edge, 0.038, 0.004, 0.001, -0.056, 0.820 - i * 0.012, 0.109);
+  decal(housing, mark, 0.082, 0.082, 0, 0.433, 0.110);
+
+  cylinder(carriage, m.black, 0.045, 0.018, 0, 1.021, ramOffset, 24);
+  const ram = group(carriage, 0, 0, ramOffset);
+  cylinder(ram, m.ceramic, 0.034, 0.868, 0, 0.630, 0, 24);
+  cylinder(ram, m.steel, 0.035, 0.010, 0, 0.200, 0, 24);
   buildVastHead(ram, m, mark);
   const stylus = group(ram);
   return { bridge, carriage, ram, stylus };
@@ -504,8 +509,9 @@ export function createScene(container) {
   control.enableDamping = true;
   control.dampingFactor = 0.12;
   control.minZoom = 0.65;
-  control.maxZoom = 3.9;
-  control.maxPolarAngle = Math.PI * 0.51;
+  control.maxZoom = 120;
+  control.zoomToCursor = true;
+  control.maxPolarAngle = Math.PI * 0.64;
   let dirty = true;
   control.addEventListener('change', () => { dirty = true; });
 
@@ -581,7 +587,6 @@ export function createScene(container) {
   }
   const setView = name => {
     selectedView = name;
-    control.maxZoom = name === 'probe' ? 18 : 3.9;
     if (name === 'probe') {
       probeCenter = probeFocus();
       control.target.copy(probeCenter);
@@ -597,6 +602,58 @@ export function createScene(container) {
     control.update();
     dirty = true;
   };
+  const focusRay = new THREE.Raycaster();
+  function focusAt(clientX, clientY) {
+    const bounds = renderer.domElement.getBoundingClientRect();
+    if (!bounds.width || !bounds.height) return;
+    const pointer = new THREE.Vector2(
+      (clientX - bounds.left) / bounds.width * 2 - 1,
+      1 - (clientY - bounds.top) / bounds.height * 2,
+    );
+    camera.updateMatrixWorld();
+    scene.updateMatrixWorld();
+    focusRay.setFromCamera(pointer, camera);
+    const parts = [];
+    scene.traverseVisible(object => {
+      if (object.isMesh && object !== floor && !object.material.transparent) parts.push(object);
+    });
+    const hit = focusRay.intersectObjects(parts, false)[0];
+    if (!hit) return;
+    camera.position.add(hit.point.clone().sub(control.target));
+    control.target.copy(hit.point);
+    camera.zoom = Math.min(control.maxZoom, camera.zoom * 2);
+    camera.updateProjectionMatrix();
+    control.update();
+    dirty = true;
+  }
+
+  let touchStart, firstTap;
+  let lastTouchFocus = -Infinity;
+  const surface = renderer.domElement;
+  surface.addEventListener('dblclick', event => {
+    if (event.button === 0 && performance.now() - lastTouchFocus > 450) focusAt(event.clientX, event.clientY);
+  });
+  surface.addEventListener('pointerdown', event => {
+    if (event.pointerType !== 'touch') return;
+    if (event.isPrimary) touchStart = { x: event.clientX, y: event.clientY, time: event.timeStamp };
+    else touchStart = firstTap = null;
+  });
+  surface.addEventListener('pointerup', event => {
+    if (event.pointerType !== 'touch' || !event.isPrimary || !touchStart) return;
+    const tap = { x: event.clientX, y: event.clientY, time: event.timeStamp };
+    const moved = Math.hypot(tap.x - touchStart.x, tap.y - touchStart.y) > 10;
+    const held = tap.time - touchStart.time > 350;
+    touchStart = null;
+    if (moved || held) {
+      firstTap = null;
+    } else if (firstTap && tap.time - firstTap.time < 330 && Math.hypot(tap.x - firstTap.x, tap.y - firstTap.y) < 25) {
+      firstTap = null;
+      lastTouchFocus = performance.now();
+      focusAt(tap.x, tap.y);
+    } else firstTap = tap;
+  });
+  surface.addEventListener('pointercancel', () => { touchStart = firstTap = null; });
+
   const resize = () => {
     const { clientWidth: width, clientHeight: height } = container;
     if (!height || !width) return;
@@ -628,7 +685,7 @@ export function createScene(container) {
         const [wx, wy, wz] = worldPosition(position);
         moving.bridge.position.z = wz - frame.ramLead / 1000;
         moving.carriage.position.x = wx;
-        moving.ram.position.set(0, wy, frame.ramLead / 1000);
+        moving.ram.position.y = wy;
         if (selectedView === 'probe') {
           const center = probeFocus();
           const shift = center.clone().sub(probeCenter);

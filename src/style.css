@@ -162,7 +162,11 @@ h2 { margin: 0; }
   border-radius: 5px;
   white-space: nowrap;
 }
-.stage-hint span { padding: 0 4px; color: #798a9b; }
+.touch-hint { display: none; }
+@media (pointer: coarse) {
+  .mouse-hint { display: none; }
+  .touch-hint { display: inline; }
+}
 .stage-status {
   padding: 10px 15px;
   display: flex;

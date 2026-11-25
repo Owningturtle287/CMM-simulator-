@@ -117,7 +117,7 @@ export function layout() {
               <path d="m33 49 23-19m-7 1 7-1-2 6" stroke="#23734e"/><text x="58" y="27" fill="#23734e">Y</text>
               <circle cx="33" cy="49" r="3" fill="#526477"/>
             </svg>
-            <div class="stage-hint">Drag to orbit <span>·</span> Scroll or pinch to zoom</div>
+            <div class="stage-hint"><span class="mouse-hint">Scroll to zoom · Double-click to focus</span><span class="touch-hint">Pinch to zoom · Double-tap to focus</span></div>
             <button class="icon-button reset" data-reset aria-label="Reset camera" title="Reset camera">${icon('reset')}</button>
           </div>
         </div>
@@ -168,6 +168,7 @@ export function layout() {
     <div class="dialog-head"><h2>Operating the simulator</h2><button type="button" class="icon-button" data-close aria-label="Close control guide">${icon('cross')}</button></div>
     <dl>
       <dt>Jog the machine</dt><dd>Hold and drag the right stick for X/Y and the left stick for Z. On desktop, use W/A/S/D and Q/E. Unlock either joystick after the console idles for a minute.</dd>
+      <dt>Inspect the machine</dt><dd>Scroll over a spot or pinch around it to zoom. Double-click or double-tap a part to center it. Drag to orbit, or drag with the right mouse button or two fingers to pan.</dd>
       <dt>Machine coordinates</dt><dd>From the front, +X is right, +Y is away and +Z is up. Zero is at the front-left of the measuring area at granite height. The rear rack uses service travel beyond Y 1,200 mm.</dd>
       <dt>Change a stylus</dt><dd>With drives on and AUTO selected, choose a rear rack port. Each adapter slides into its socket from the front. The magnetic receiver releases the old plate and slides the selected plate out. Each system has a single downward tip.</dd>
       <dt>Power and reference</dt><dd>Press the red mushroom to stop. Press it again to simulate twisting it loose, then press M to enable drives. For reference travel, press Shift, Return, then F12.</dd>
