@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Machine, orientJog, ports, rack, stylusLength, travel, workpiece, worldPosition } from '../src/machine.js';
+import { Machine, axisTravel, orientJog, ports, rack, rackCoverOpening, rackSeat, startingPosition, travel, workpiece, worldPosition } from '../src/machine.js';
 import { Console } from '../src/console.js';
 
 const still = { x: 0, y: 0, z: 0 };
@@ -10,8 +10,8 @@ function run(machine, predicate, seconds = 125) {
 }
 
 test('machine coordinates map right, away and up from the operating position', () => {
-  assert.deepEqual(worldPosition({ x: 0, y: 0, z: 0 }), [-0.45, 0, 0.6]);
-  assert.deepEqual(worldPosition(travel), [0.45, 0.8, -0.6]);
+  assert.deepEqual(worldPosition({ x: 0, y: 0, z: 0 }), [-0.45, 0, 0.84]);
+  assert.deepEqual(worldPosition(travel), [0.45, 0.8, -0.36]);
   assert.deepEqual(orientJog({ x: -1, y: 0, z: 1 }, 1), { x: 0, y: 1, z: 1 });
   assert.deepEqual(orientJog({ x: 0, y: -1, z: 0 }, 1), { x: -1, y: -0, z: 0 });
 });
@@ -22,7 +22,7 @@ test('each axis obeys the jog lock, override, inactivity and soft limits', () =>
   m.locks.x = true;
   m.update(0.05, { x: 1, y: 1, z: 0 });
   assert.equal(m.position.x, 450);
-  assert.ok(m.position.y > 415);
+  assert.ok(m.position.y > startingPosition.y);
   m.locks.x = false;
   for (let i = 0; i < 100; i++) m.update(0.05, { x: 1 });
   assert.equal(m.position.x, travel.x);
@@ -36,24 +36,51 @@ test('each axis obeys the jog lock, override, inactivity and soft limits', () =>
   assert.equal(m.position.x, travel.x);
 });
 
+test('front jogging reaches the revised datum and rear jogging still treats the rack as an obstruction', () => {
+  const m = new Machine();
+  m.speed = 100;
+  for (let i = 0; i < 100; i++) m.update(0.05, { y: -1 });
+  assert.equal(m.position.y, 0);
+  assert.equal(worldPosition(m.position)[2], 0.84);
+
+  for (let i = 0; i < 150; i++) m.update(0.05, { y: 1 });
+  assert.equal(m.position.y, axisTravel.y);
+  assert.equal(worldPosition(m.position)[2], -0.62);
+  for (let i = 0; i < 60; i++) m.update(0.05, { z: -1 });
+  assert.equal(m.fault, 'Rack obstruction');
+  assert.ok(m.position.z > rack.plate);
+  m.slow = true;
+  m.update(0.05, { z: 1 });
+  assert.equal(m.fault, '');
+});
+
 test('tool change stores the first tool and docks the requested tool before retracting', () => {
   const m = new Machine();
   m.speed = 100;
   assert.ok(m.startChange(6));
+  run(m, () => m.message === 'Releasing adapter at port 1');
+  assert.equal(m.loaded, 1);
+  assert.equal(m.position.y, rack.y);
+  assert.equal(m.position.z, rackSeat);
+  assert.equal(rackCoverOpening(m.position.y), 1);
   run(m, () => m.loaded === null);
   assert.equal(m.dock, 1);
   assert.equal(m.position.y, rack.y);
-  assert.equal(m.position.z, rack.plate - stylusLength);
+  assert.equal(m.position.z, rackSeat);
+  run(m, () => m.message === 'Coupling adapter at port 6');
+  assert.equal(m.loaded, null);
+  assert.equal(m.position.z, rackSeat);
   run(m, () => m.loaded === 6);
   assert.equal(m.dock, 6);
   run(m, () => !m.plan);
   assert.equal(m.dock, null);
-  assert.deepEqual(m.position, { x: ports[5].x, y: rack.approach, z: rack.safe });
+  assert.deepEqual(m.position, { x: ports[5].x, y: travel.y, z: rack.safe });
+  assert.equal(rackCoverOpening(m.position.y), 0);
 });
 
 test('emergency stop freezes interrupted changes and each transfer phase can recover', () => {
   for (const stage of [
-    m => m.message === 'Docking at port 1' && m.position.y > rack.approach + 20,
+    m => m.message === 'Sliding into port 1' && m.position.y > rack.approach + 20,
     m => m.dock === 1 && m.loaded === null,
     m => m.dock === 4 && m.loaded === 4,
   ]) {
@@ -80,7 +107,7 @@ test('rack clearance recovery cannot push an interrupted pickup back into its po
   const m = new Machine();
   m.speed = 100;
   m.startChange(2);
-  run(m, () => m.dock === 2 && m.loaded === null && m.position.y === rack.y && m.position.z < rack.plate - stylusLength + 25);
+  run(m, () => m.dock === 2 && m.loaded === null && m.position.y === rack.y && m.position.z < rackSeat + 25);
   m.abort();
   assert.ok(m.startChange(3));
   run(m, () => !m.plan);

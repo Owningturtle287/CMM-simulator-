@@ -31,7 +31,7 @@ export class Console {
         display('Position D17', () => axes.map(a => `${a.toUpperCase()}  ${formatAxis(m.position[a])} mm`)),
         display('Velocity D18', () => axes.map(a => `${a.toUpperCase()}  ${m.velocity[a].toFixed(2)} mm/s`)),
         display('Status D16X', () => [m.drives ? 'DRIVES ON' : 'DRIVES OFF', m.plan ? 'CNC TRAVEL' : m.mode, m.fault || sides[m.side]]),
-        display('Probe data', () => [m.loaded ? `System ${m.loaded} / stylus 1` : 'No stylus mounted', 'Straight-down stylus', m.scan ? 'Scanning enabled' : 'Scanning disabled']),
+        display('Probe data', () => [m.loaded ? `System ${m.loaded} / stylus 1` : 'No stylus mounted', 'VAST XT gold', m.scan ? 'Scanning enabled' : 'Scanning disabled']),
         display('Scales', () => ['Machine frame', '+X right · +Y rear', '+Z up · mm']),
       ]),
       menu('CMM menu', [
@@ -146,7 +146,7 @@ export class Console {
       case 'slow':
         m.slow = !m.slow;
         return m.report(m.slow ? 'SLOW on. Travel limited to probing speed.' : 'SLOW off.');
-      case 'swivel': return m.report('This fixed VAST probe has no articulating axes.');
+      case 'swivel': return m.report('The VAST XT gold head has fixed orientation.');
       case 'rotary': return m.report('This setup has no rotary table.');
       case 'intermediate': return m.recordPoint('Intermediate');
       case 'point': return m.recordPoint('Measurement');
@@ -238,8 +238,7 @@ export class Console {
     e.last = null;
   }
 
-  lcd() {
-    const m = this.machine;
+  menuDisplay() {
     const escape = value => value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
     if (this.editor) {
       const { text, at } = this.editor;
@@ -252,14 +251,27 @@ export class Console {
         `<span class="${index === start + i ? 'selected' : ''}">${child.name}${child.children ? ' ›' : ''}</span>`).join('') :
         read().map(line => `<span>${escape(line)}</span>`).join('')}</div>`;
     }
-    const top = m.stopped ? 'E-STOP' : m.plan ? 'CNC' : m.drives ? m.mode : 'DRIVES OFF';
-    return `<div class="lcd-top"><span>${top}</span><span>${m.loaded ? 'STYLUS 1' : 'NO STYLUS'}</span></div>
-      <div class="lcd-data">${axes.map(a => `<div><span>${a.toUpperCase()}</span>+${formatAxis(m.position[a])}</div>`).join('')}</div>
+    return null;
+  }
+
+  defaultDisplay() {
+    return `<div class="lcd-top"><span data-lcd="mode"></span><span data-lcd="stylus"></span></div>
+      <div class="lcd-data">${axes.map(a => `<div><span>${a.toUpperCase()}</span><b data-lcd="${a}"></b></div>`).join('')}</div>
       <svg class="lcd-probe" viewBox="0 0 62 53" aria-hidden="true">
         <path d="M31 3v43m-14-18h28m-22 7 16-15m-12-17h8" fill="none" stroke="currentColor" stroke-width="2"/>
-        <circle cx="31" cy="46" r="5" class="${m.loaded ? 'active' : ''}"/><circle cx="17" cy="28" r="4"/>
+        <circle cx="31" cy="46" r="5" data-lcd="tip"/><circle cx="17" cy="28" r="4"/>
         <circle cx="45" cy="28" r="4"/><circle cx="22" cy="36" r="4"/><circle cx="40" cy="19" r="4"/>
       </svg>
-      <div class="lcd-bottom"><span>${escape(this.sessionName)}</span><span>${m.scan ? 'SCAN · ' : ''}${m.speed}%${m.slow ? ` · ${probingRate}` : ` · ${maxRate}`}</span></div>`;
+      <div class="lcd-bottom"><span data-lcd="session"></span><span data-lcd="speed"></span></div>`;
+  }
+
+  displayValues() {
+    const m = this.machine;
+    return {
+      mode: m.stopped ? 'E-STOP' : m.plan ? 'CNC' : m.drives ? m.mode : 'DRIVES OFF',
+      stylus: m.loaded ? 'STYLUS 1' : 'NO STYLUS',
+      session: this.sessionName,
+      speed: `${m.scan ? 'SCAN · ' : ''}${m.speed}% · ${m.slow ? probingRate : maxRate}`,
+    };
   }
 }

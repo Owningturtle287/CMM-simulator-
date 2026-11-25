@@ -1,5 +1,5 @@
 import './style.css';
-import { Machine, axes, ports } from './machine.js';
+import { Machine, axes, ports, travel } from './machine.js';
 import { createScene } from './scene.js';
 import { Console } from './console.js';
 import { layout } from './layout.js';
@@ -16,6 +16,7 @@ const elements = {
   mobile: Object.fromEntries(axes.map(axis => [axis, $(`#mobile-${axis}`)])),
   message: $('#message'),
   diode: $('#machine-diode'),
+  frameLabel: $('.stage-frame'),
   mode: $('#mode'),
   drives: $('#drive-status'),
   stylus: $('#active-stylus'),
@@ -285,34 +286,62 @@ const pressed = {
 };
 const keyStates = $$('[data-key]').filter(button => button.dataset.key in pressed);
 const portOptions = [...select.options].slice(1);
-let previousLCD = '';
+let previousMenu;
+let positionDisplay;
+let lastSettings;
 let previousPoints = -1;
 let previousTouch = false;
 let previousFault = '';
 let previousLock = false;
+function updateConsoleDisplay(m, coordinates) {
+  const menu = controller.menuDisplay();
+  if (menu !== null) {
+    if (menu !== previousMenu) elements.lcd.innerHTML = menu;
+    previousMenu = menu;
+    positionDisplay = null;
+    return;
+  }
+  if (!positionDisplay) {
+    elements.lcd.innerHTML = controller.defaultDisplay();
+    positionDisplay = Object.fromEntries([...elements.lcd.querySelectorAll('[data-lcd]')]
+      .map(node => [node.dataset.lcd, node]));
+    previousMenu = null;
+  }
+  for (const axis of axes) setText(positionDisplay[axis], `+${coordinates[axis]}`);
+  for (const [key, value] of Object.entries(controller.displayValues())) setText(positionDisplay[key], value);
+  positionDisplay.tip.classList.toggle('active', Boolean(m.loaded));
+}
+
 function updateUI() {
   const m = machine;
-  const port = ports.find(p => p.id === m.loaded);
+  const coordinates = {};
   for (const axis of axes) {
     const value = m.position[axis].toFixed(3);
     setText(elements.coordinates[axis], value);
     setText(elements.mobile[axis], value);
+    coordinates[axis] = value;
   }
   setText(elements.message, m.message);
-  setText(elements.mode, m.plan ? 'CNC' : m.mode);
-  setText(elements.drives, m.stopped ? 'E-stop latched' : m.drives ? 'Enabled' : 'Disabled');
-  elements.drives.dataset.active = m.stopped ? 'stop' : String(m.drives);
-  elements.diode.dataset.state = m.stopped || m.fault ? 'error' : m.plan ? 'busy' : m.drives ? 'ready' : 'off';
-  setText(elements.stylus, port ? `Port ${String(port.id).padStart(2, '0')} · Ø${port.diameter} mm` : 'Unloaded');
-  setText(elements.speed, `${m.speed}%`);
-  elements.speedControls.forEach(input => { if (Number(input.value) !== m.speed) input.value = m.speed; });
-  elements.dial.style.setProperty('--angle', `${-135 + 2.7 * m.speed}deg`);
-  select.disabled = !m.drives || m.stopped || Boolean(m.plan) || m.mode !== 'AUTO';
-  for (const option of portOptions) {
-    const id = Number(option.value);
-    option.disabled = id === m.manualTool || (id === m.loaded && !m.dock);
-    const status = id === m.loaded ? ' · mounted' : id === m.manualTool ? ' · held' : '';
-    setText(option, `Port ${String(id).padStart(2, '0')} · Ø${ports[id - 1].diameter} mm${status}`);
+  setText(elements.frameLabel, m.position.y > travel.y ? 'REAR SERVICE TRAVEL' : 'MACHINE FRAME');
+  const settings = [m.mode, Boolean(m.plan), m.drives, m.stopped, Boolean(m.fault), m.loaded, m.manualTool, Boolean(m.dock), m.speed];
+  if (!lastSettings || settings.some((value, index) => value !== lastSettings[index])) {
+    lastSettings = settings;
+    const port = ports[m.loaded - 1];
+    setText(elements.mode, m.plan ? 'CNC' : m.mode);
+    setText(elements.drives, m.stopped ? 'E-stop latched' : m.drives ? 'Enabled' : 'Disabled');
+    elements.drives.dataset.active = m.stopped ? 'stop' : String(m.drives);
+    elements.diode.dataset.state = m.stopped || m.fault ? 'error' : m.plan ? 'busy' : m.drives ? 'ready' : 'off';
+    setText(elements.stylus, port ? `Port ${String(port.id).padStart(2, '0')} · Ø${port.diameter} mm` : 'Unloaded');
+    setText(elements.speed, `${m.speed}%`);
+    elements.speedControls.forEach(input => { if (Number(input.value) !== m.speed) input.value = m.speed; });
+    elements.dial.style.setProperty('--angle', `${-135 + 2.7 * m.speed}deg`);
+    select.disabled = !m.drives || m.stopped || Boolean(m.plan) || m.mode !== 'AUTO';
+    for (const option of portOptions) {
+      const id = Number(option.value);
+      option.disabled = id === m.manualTool || (id === m.loaded && !m.dock);
+      const status = id === m.loaded ? ' · mounted' : id === m.manualTool ? ' · held' : '';
+      setText(option, `Port ${String(id).padStart(2, '0')} · Ø${ports[id - 1].diameter} mm${status}`);
+    }
   }
   const lamps = {
     'lock-left': m.locked, 'lock-right': m.locked, [`side-${m.side}`]: true,
@@ -322,12 +351,11 @@ function updateUI() {
     ...Object.fromEntries(axes.flatMap(a => [[`axis-${a}`, m.clamps[a] || m.locks[a]], [`force-${a}`, m.force[a] !== 0]])),
   };
   for (const lamp of elements.lamps) lamp.classList.toggle('on', Boolean(lamps[lamp.dataset.lamp]));
-  for (const button of keyStates) button.setAttribute('aria-pressed', String(pressed[button.dataset.key]()));
-  const lcd = controller.lcd();
-  if (lcd !== previousLCD) {
-    elements.lcd.innerHTML = lcd;
-    previousLCD = lcd;
+  for (const button of keyStates) {
+    const value = String(pressed[button.dataset.key]());
+    if (button.getAttribute('aria-pressed') !== value) button.setAttribute('aria-pressed', value);
   }
+  updateConsoleDisplay(m, coordinates);
   if (m.points.length !== previousPoints) {
     elements.clear.hidden = m.points.length === 0;
     elements.points.innerHTML = m.points.length ? `<ol>${m.points.map((point, index) => `<li>
@@ -351,7 +379,7 @@ function frame(now) {
   const steps = Math.max(1, Math.ceil(seconds / 0.05));
   const input = readInput();
   for (let step = 0; step < steps; step++) machine.update(seconds / steps, input);
-  scene?.render(machine);
+  scene?.render(machine, now);
   if (now - lastUI > 45) { updateUI(); lastUI = now; }
   window.requestAnimationFrame(frame);
 }

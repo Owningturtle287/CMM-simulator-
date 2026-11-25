@@ -131,11 +131,12 @@ export function layout() {
           <div class="coordinates">
             ${axes.map(a => `<div class="coordinate ${a}"><label>${a.toUpperCase()}</label><output id="coord-${a}" aria-label="${a.toUpperCase()} coordinate">0.000</output></div>`).join('')}
           </div>
-          <div class="work-envelope"><span>Travel range</span><b>${travel.x} × ${travel.y} × ${travel.z}</b></div>
+          <div class="work-envelope"><span>Measuring range</span><b>${travel.x} × ${travel.y} × ${travel.z}</b></div>
         </section>
         <section class="card state">
           <div class="card-heading"><h2>Machine status</h2><span id="mode">AUTO</span></div>
           <div class="state-line"><span>Drives</span><b id="drive-status"></b></div>
+          <div class="state-line"><span>Probe head</span><b>VAST XT gold</b></div>
           <div class="state-line"><span>Active stylus</span><b id="active-stylus"></b></div>
           <div class="state-line"><label for="speed">Speed override</label><b id="speed-value">35%</b></div>
           <input id="speed" type="range" data-speed min="0" max="100" value="35" aria-label="Speed override">
@@ -166,8 +167,8 @@ export function layout() {
     <div class="dialog-head"><h2>Operating the simulator</h2><button type="button" class="icon-button" data-close aria-label="Close control guide">${icon('cross')}</button></div>
     <dl>
       <dt>Jog the machine</dt><dd>Hold and drag the right stick for X/Y and the left stick for Z. On desktop, use W/A/S/D and Q/E. Unlock either joystick after the console idles for a minute.</dd>
-      <dt>Machine coordinates</dt><dd>From the front, +X is right, +Y is away and +Z is up. Zero is the front-left corner of the travel area at granite height.</dd>
-      <dt>Change a stylus</dt><dd>With drives on and AUTO selected, choose a rear rack port. The machine stores the mounted stylus and retrieves the selected one. Each system has a single downward tip.</dd>
+      <dt>Machine coordinates</dt><dd>From the front, +X is right, +Y is away and +Z is up. Zero is at the front-left of the measuring area at granite height. The rear rack uses service travel beyond Y 1,200 mm.</dd>
+      <dt>Change a stylus</dt><dd>With drives on and AUTO selected, choose a rear rack port. The VAST XT gold head releases the mounted adapter plate into its socket, then couples to the selected plate. Each system has a single downward tip.</dd>
       <dt>Power and reference</dt><dd>Press the red mushroom to stop. Press it again to simulate twisting it loose, then press M to enable drives. For reference travel, press Shift, Return, then F12.</dd>
       <dt>Record a point</dt><dd>Press M-Point to record the current 3D point. Click the center of the right stick to record an intermediate travel point.</dd>
       <dt>Console functions</dt><dd>Menu opens the built-in settings. Shift, Return, then F5 or F6 switches AUTO or MAN. The physical keypad uses the same shortcuts. The optional rotary table, articulated probe, and host function keys require their corresponding hardware or software.</dd>

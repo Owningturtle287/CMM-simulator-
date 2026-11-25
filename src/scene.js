@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { createSoftwareView } from './software-view.js';
-import { ports, rack, stylusLength, workpiece, worldPosition } from './machine.js';
+import { frame, ports, rack, rackCoverOpening, stylusLength, vastXT, workpiece, worldPosition } from './machine.js';
 
 const logo = `${import.meta.env.BASE_URL}zeiss.svg`;
 const metal = (color, metalness, roughness, extra = {}) =>
@@ -120,17 +121,17 @@ function materials() {
     steel: metal(0x9eacb8, 0.99, 0.18),
     ceramic: metal(0xd9d6c7, 0.19, 0.25),
     ruby: new THREE.MeshPhysicalMaterial({ color: 0xa21239, roughness: 0.17, metalness: 0.2, clearcoat: 1 }),
-    blue: metal(0x0a58ae, 0.14, 0.33),
+    probeShell: metal(0xa8adb2, 0.66, 0.31),
+    probeFace: metal(0x92979e, 0.39, 0.37),
   };
 }
 
 function buildBase(scene, m) {
-  box(scene, m.graniteEdge, 1.733, 0.442, 1.86, 0, -0.239, 0, 0.021);
-  box(scene, m.granite, 1.731, 0.047, 1.858, 0, -0.0235, 0, 0.014);
-  box(scene, m.granite, 0.163, 0.094, 1.825, 0.706, 0.046, -0.026, 0.011);
-  box(scene, m.rubber, 0.026, 0.016, 1.75, 0.719, 0.097, -0.01, 0.004);
-  box(scene, m.steel, 0.021, 0.018, 1.736, 0.687, 0.093, -0.012, 0.004);
-  box(scene, m.granite, 0.17, 0.031, 1.815, -0.683, 0.015, -0.028, 0.008);
+  // The right-hand guide is a granite step. Both guides extend to the bridge end stops.
+  box(scene, m.graniteEdge, 1.733, 0.442, 1.94, 0, -0.239, -0.023, 0.021);
+  box(scene, m.granite, 1.731, 0.047, 1.938, 0, -0.0235, -0.023, 0.014);
+  box(scene, m.granite, 0.266, 0.109, 1.935, 0.758, 0.054, -0.023, 0.009);
+  box(scene, m.granite, 0.143, 0.024, 1.888, -0.674, 0.011, -0.024, 0.007);
   for (const x of [-0.689, 0.689]) {
     for (const z of [-0.704, 0.058, 0.719]) {
       box(scene, m.black, 0.231, 0.032, 0.201, x, -0.685, z, 0.014);
@@ -154,15 +155,19 @@ function buildBase(scene, m) {
 
 function buildBridge(scene, m, mark) {
   const bridge = group(scene);
-  box(bridge, m.black, 0.251, 0.133, 0.378, 0.706, 0.159, 0.024, 0.023);
-  box(bridge, m.black, 0.187, 0.056, 0.234, -0.663, 0.057, 0.022, 0.009);
+  const right = 0.706;
+  // A shallow saddle rides above the step. The inboard skirt drops beside it.
+  box(bridge, m.black, 0.344, 0.102, 0.438, right - 0.014, 0.165, 0.004, 0.016);
+  box(bridge, m.black, 0.093, 0.137, 0.429, 0.573, 0.083, 0.004, 0.012);
+  box(bridge, m.rubber, 0.237, 0.009, 0.405, 0.746, 0.113, 0.004, 0.004);
+  box(bridge, m.black, 0.187, 0.044, 0.234, -0.663, 0.046, 0.022, 0.009);
   box(bridge, m.white, 0.19, 1.294, 0.213, -0.663, 0.716, 0.025, 0.019);
-  box(bridge, m.white, 0.224, 1.153, 0.275, 0.706, 0.792, 0.024, 0.021);
-  box(bridge, m.edge, 0.018, 1.142, 0.196, 0.819, 0.786, 0.015, 0.008);
-  box(bridge, m.white, 0.007, 1.105, 0.183, 0.829, 0.792, 0.015, 0.003);
+  box(bridge, m.white, 0.282, 1.156, 0.36, right, 0.786, 0.01, 0.02);
+  box(bridge, m.edge, 0.010, 1.125, 0.282, 0.845, 0.786, 0.008, 0.005);
+  box(bridge, m.white, 0.007, 1.107, 0.263, 0.85, 0.792, 0.008, 0.003);
   box(bridge, m.white, 0.095, 0.274, 0.064, -0.674, 1.192, -0.099, 0.015);
   const name = textMap('A C C U R A', { font: '700 66px Arial' });
-  decal(bridge, name, 0.304, 0.060, 0.706, 0.554, 0.1635).rotation.z = Math.PI / 2;
+  decal(bridge, name, 0.304, 0.060, right + 0.032, 0.554, 0.192).rotation.z = Math.PI / 2;
 
   box(bridge, m.black, 1.26, 0.277, 0.224, 0.008, 1.172, -0.029, 0.015);
   box(bridge, m.aluminum, 1.25, 0.187, 0.036, 0.008, 1.175, 0.089, 0.005);
@@ -192,57 +197,87 @@ function buildBridge(scene, m, mark) {
   box(ram, m.aluminum, 0.007, 1.239, 0.033, 0.089, 0.994, 0.022, 0.002);
   for (let i = 0; i < 4; i++) box(ram, m.edge, 0.035, 0.005, 0.001, -0.053, 1.585 - i * 0.012, 0.0845);
   decal(ram, mark, 0.061, 0.061, 0.032, 1.076, 0.086);
-  cylinder(ram, m.ceramic, 0.034, 0.226, 0, 0.285, 0, 32);
-  cylinder(ram, m.steel, 0.048, 0.018, 0, 0.181, 0);
-  cylinder(ram, m.black, 0.047, 0.019, 0, 0.161, 0);
-  cylinder(ram, m.aluminum, 0.046, 0.059, 0, 0.123, 0);
-  cylinder(ram, m.steel, 0.037, 0.011, 0, 0.0945, 0);
-  decal(ram, mark, 0.024, 0.024, 0.0, 0.125, 0.0461);
+  cylinder(ram, m.ceramic, 0.034, 0.206, 0, 0.299, 0, 24);
+  buildVastHead(ram, m, mark);
   const stylus = group(ram);
   return { bridge, carriage, ram, stylus };
 }
 
+function buildVastHead(ram, m, mark) {
+  const { width, depth, height } = vastXT;
+  const head = group(ram, 0, stylusLength / 1000, 0);
+  const h = height / 1000;
+  box(head, m.probeShell, width / 1000, h - 0.013, depth / 1000, 0, 0.055, 0, 0.007);
+  box(head, m.black, 0.089, 0.016, 0.089, 0, 0.014, 0, 0.005);
+  box(head, m.probeShell, 0.081, 0.008, 0.079, 0, h - 0.003, 0, 0.003);
+  box(head, m.probeFace, 0.060, 0.087, 0.006, 0, 0.052, 0.044, 0.004);
+  for (const side of [-1, 1]) {
+    for (let groove = 0; groove < 4; groove++) {
+      const y = 0.031 + groove * 0.0076;
+      const fin = box(head, m.edge, 0.018, 0.0019, 0.003, side * 0.037, y, 0.0447, 0.0008);
+      fin.rotation.z = side * 0.20;
+    }
+  }
+  cylinder(head, m.steel, 0.035, 0.006, 0, 0.003, 0, 28);
+  cylinder(head, m.black, 0.025, 0.001, 0, -0.0005, 0, 24);
+  decal(head, mark, 0.018, 0.018, 0, 0.072, 0.0478);
+  const vast = textMap('VAST', { width: 280, height: 92, color: '#8b6d37', font: 'italic 900 75px Arial' });
+  const xt = textMap('XT', { width: 110, height: 75, color: '#191b20', font: 'italic 900 67px Arial' });
+  decal(head, vast, 0.039, 0.013, -0.001, 0.038, 0.0478);
+  decal(head, xt, 0.010, 0.0068, 0.013, 0.0285, 0.0478);
+}
+
 function buildStylus(parent, m, port) {
   const length = stylusLength / 1000;
+  const plateRadius = vastXT.plateDiameter / 2000;
   const ball = port.diameter / 2000;
-  cylinder(parent, m.steel, 0.036, 0.009, 0, -0.003, 0);
-  cylinder(parent, m.black, 0.029, 0.007, 0, -0.010, 0);
-  cylinder(parent, m.aluminum, 0.015, 0.019, 0, -0.022, 0, 24, 0.009);
-  cylinder(parent, m.steel, 0.0037, length - 0.031 - ball, 0, -(length + 0.031 - ball) / 2, 0, 16);
-  addMesh(parent, new THREE.SphereGeometry(ball, 20, 12), m.ruby, 0, -length + ball, 0);
+  cylinder(parent, m.steel, plateRadius - 0.003, 0.006, 0, -0.003, 0, 28);
+  cylinder(parent, m.aluminum, plateRadius, 0.006, 0, -0.009, 0, 28);
+  cylinder(parent, m.steel, 0.023, 0.004, 0, -0.014, 0, 22);
+  box(parent, m.black, 0.022, 0.022, 0.022, 0, -0.026, 0, 0.002);
+  cylinder(parent, m.steel, 0.006, 0.012, 0, -0.042, 0, 14);
+  const shaftTop = 0.047;
+  cylinder(parent, m.steel, 0.0025, length - shaftTop - ball, 0, -(length + shaftTop - ball) / 2, 0, 12);
+  addMesh(parent, new THREE.SphereGeometry(ball, 14, 10), m.ruby, 0, -length + ball, 0);
 }
 
 function buildRack(scene, m) {
-  const rackGroup = group(scene, 0, 0, (600 - rack.y) / 1000);
+  const [, , rear] = worldPosition({ x: frame.originX, y: rack.y, z: 0 });
+  const rackGroup = group(scene, 0, 0, rear);
+  const fixed = group(rackGroup);
   for (const x of [-0.407, 0.407]) {
-    box(rackGroup, m.aluminum, 0.069, 0.027, 0.252, x, 0.014, 0.007, 0.004);
-    for (const z of [-0.124, 0.138]) box(rackGroup, m.black, 0.071, 0.026, 0.018, x, 0.013, z, 0.003);
-    box(rackGroup, m.aluminum, 0.051, 0.364, 0.057, x, 0.199, -0.033, 0.004);
-    for (const dx of [-0.013, 0.013]) box(rackGroup, m.black, 0.003, 0.329, 0.002, x + dx, 0.184, -0.003);
-    box(rackGroup, m.aluminum, 0.054, 0.055, 0.054, x, 0.060, -0.009, 0.004);
-    cylinder(rackGroup, m.steel, 0.013, 0.003, x, 0.028, 0.086, 16);
+    box(fixed, m.aluminum, 0.069, 0.027, 0.264, x, 0.014, -0.016, 0.004);
+    for (const z of [-0.146, 0.114]) box(fixed, m.black, 0.071, 0.026, 0.018, x, 0.013, z, 0.003);
+    box(fixed, m.aluminum, 0.051, 0.364, 0.057, x, 0.199, -0.056, 0.004);
+    for (const dx of [-0.013, 0.013]) box(fixed, m.black, 0.003, 0.329, 0.002, x + dx, 0.184, -0.026);
+    box(fixed, m.aluminum, 0.054, 0.055, 0.054, x, 0.060, -0.034, 0.004);
+    cylinder(fixed, m.steel, 0.013, 0.003, x, 0.028, 0.067, 12);
   }
-  box(rackGroup, m.aluminum, 0.898, 0.05, 0.052, 0, 0.364, -0.074, 0.006);
-  box(rackGroup, m.black, 0.913, 0.013, 0.026, 0, 0.36, -0.046, 0.004);
-  decal(rackGroup, textMap('MSR', { width: 160, height: 72, color: '#a02026', font: '800 50px Arial' }),
-    0.070, 0.025, -0.406, 0.151, -0.002).rotation.z = Math.PI / 2;
-  return ports.map(port => {
-    const x = (port.x - 450) / 1000;
-    const holder = group(rackGroup, x, rack.plate / 1000, 0);
-    box(holder, m.black, 0.113, 0.027, 0.062, 0, -0.009, -0.049, 0.006);
+  box(fixed, m.aluminum, 0.918, 0.05, 0.052, 0, 0.357, -0.086, 0.006);
+  decal(fixed, textMap('MSR', { width: 160, height: 72, color: '#a02026', font: '800 50px Arial' }),
+    0.070, 0.025, -0.406, 0.151, -0.025).rotation.z = Math.PI / 2;
+  const stations = ports.map(port => {
+    const x = (port.x - frame.originX) / 1000;
+    const seat = rack.plate / 1000;
+    box(fixed, m.black, 0.116, 0.028, 0.036, x, seat + 0.001, -0.066, 0.004);
     for (const side of [-1, 1]) {
-      box(holder, m.black, 0.033, 0.023, 0.085, side * 0.041, -0.008, 0.012, 0.005);
-      box(holder, m.aluminum, 0.011, 0.011, 0.004, side * 0.043, -0.006, 0.055, 0.001);
-      cylinder(holder, m.steel, 0.006, 0.003, side * 0.045, 0.006, 0.031, 12);
+      box(fixed, m.black, 0.014, 0.028, 0.134, x + side * 0.051, seat + 0.001, -0.006, 0.003);
+      box(fixed, m.steel, 0.022, 0.008, 0.086, x + side * 0.041, seat - 0.016, -0.004, 0.002);
     }
-    const label = decal(holder, textMap(String(port.id), {
+    const label = decal(fixed, textMap(String(port.id), {
       width: 64, height: 64, background: '#dde2e8', font: '700 45px Arial',
-    }), 0.019, 0.019, 0, 0.006, -0.044);
+    }), 0.017, 0.017, x, seat + 0.016, -0.068);
     label.rotation.x = -Math.PI / 2;
-    const stored = group(holder);
+    const cover = group(rackGroup, x, seat + 0.017, -0.052);
+    box(cover, m.black, 0.095, 0.006, 0.104, 0, 0, 0.052, 0.002);
+    for (let rib = 0; rib < 8; rib++) {
+      box(cover, m.rubber, 0.09, 0.002, 0.004, 0, 0.003, 0.008 + rib * 0.012);
+    }
+    const stored = group(rackGroup, x, seat, 0);
     buildStylus(stored, m, port);
-    return stored;
+    return { cover, stored };
   });
+  return { fixed, stations };
 }
 
 function buildArtifact(scene, m) {
@@ -261,10 +296,42 @@ function buildArtifact(scene, m) {
   return item;
 }
 
+// Merge each rigid assembly independently so moving axes keep their own transforms.
+function batchOpaque(root, moving = []) {
+  root.updateWorldMatrix(true, true);
+  const inverse = root.matrixWorld.clone().invert();
+  const byMaterial = new Map();
+  function collect(object) {
+    if (moving.includes(object)) return;
+    if (object.isMesh && !object.material.transparent) {
+      const batch = byMaterial.get(object.material) ?? [];
+      batch.push(object);
+      byMaterial.set(object.material, batch);
+    }
+    for (const child of object.children) collect(child);
+  }
+  collect(root);
+  for (const [material, meshes] of byMaterial) {
+    if (meshes.length < 2) continue;
+    const parts = meshes.map(mesh => {
+      const copy = mesh.geometry.index ? mesh.geometry.toNonIndexed() : mesh.geometry.clone();
+      return copy.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inverse, mesh.matrixWorld));
+    });
+    const geometry = mergeGeometries(parts);
+    parts.forEach(part => part.dispose());
+    if (!geometry) continue;
+    addMesh(root, geometry, material, 0, 0, 0);
+    for (const mesh of meshes) {
+      mesh.removeFromParent();
+      mesh.geometry.dispose();
+    }
+  }
+}
+
 const views = {
   iso: { eye: [3.1, 2.22, 4.22], target: [0, 0.75, 0.018], zoom: 1.00 },
   front: { eye: [0, 1.76, 5.3], target: [0, 0.75, 0.0], zoom: 1.00 },
-  rack: { eye: [1.32, 2.70, -4.20], target: [0, 0.24, -0.48], zoom: 2.60 },
+  rack: { eye: [1.32, 2.70, -4.34], target: [0, 0.24, -0.62], zoom: 2.60 },
 };
 
 export function createScene(container) {
@@ -275,8 +342,10 @@ export function createScene(container) {
   if (context) {
     try {
       webGL = new THREE.WebGLRenderer({ canvas, context, ...options });
-      webGL.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+      const pixelLimit = window.matchMedia('(pointer: coarse)').matches ? 1.5 : 1.75;
+      webGL.setPixelRatio(Math.min(window.devicePixelRatio, pixelLimit));
       webGL.shadowMap.enabled = true;
+      webGL.shadowMap.autoUpdate = false;
       webGL.shadowMap.type = THREE.PCFShadowMap;
       webGL.toneMapping = THREE.ACESFilmicToneMapping;
       webGL.toneMappingExposure = 1.17;
@@ -313,7 +382,7 @@ export function createScene(container) {
   const key = new THREE.DirectionalLight(0xfff8ef, 2.5);
   key.position.set(-3.1, 5.4, 3.2);
   key.castShadow = true;
-  key.shadow.mapSize.set(1536, 1536);
+  key.shadow.mapSize.set(1024, 1024);
   Object.assign(key.shadow.camera, { left: -2.6, right: 2.6, top: 2.8, bottom: -2.8, near: 0.2, far: 13 });
   key.shadow.bias = -0.00035;
   key.shadow.normalBias = 0.006;
@@ -336,14 +405,35 @@ export function createScene(container) {
   const mark = new THREE.TextureLoader().load(logo, () => { dirty = true; });
   mark.colorSpace = THREE.SRGBColorSpace;
   mark.anisotropy = 8;
-  buildBase(scene, m);
+  const base = group(scene);
+  buildBase(base, m);
   const moving = buildBridge(scene, m, mark);
-  const parked = buildRack(scene, m);
+  const { fixed: rackFrame, stations } = buildRack(scene, m);
   const artifact = buildArtifact(scene, m);
   const active = ports.map(port => {
     const tool = group(moving.stylus, 0, stylusLength / 1000, 0);
     buildStylus(tool, m, port);
     return tool;
+  });
+
+  if (webGL) {
+    batchOpaque(base);
+    batchOpaque(moving.bridge, [moving.carriage]);
+    batchOpaque(moving.carriage, [moving.ram]);
+    batchOpaque(moving.ram, [moving.stylus]);
+    batchOpaque(rackFrame);
+    batchOpaque(artifact);
+    active.forEach(tool => batchOpaque(tool));
+    for (const { cover, stored } of stations) {
+      batchOpaque(cover);
+      batchOpaque(stored);
+    }
+  }
+
+  scene.traverse(object => {
+    if (!object.isMesh) return;
+    object.updateMatrix();
+    object.matrixAutoUpdate = false;
   });
 
   const setView = name => {
@@ -372,27 +462,47 @@ export function createScene(container) {
   setView('iso');
   resize();
 
-  let last = '';
+  let x, y, z, lastLoaded, lastHeld, lastArtifact, lastDock, lastOpening;
+  let shadowPending = true, nextShadow = 0;
   return {
     setView,
-    render(machine) {
-      const { position, loaded, manualTool } = machine;
-      const state = `${position.x},${position.y},${position.z},${loaded},${manualTool},${machine.artifact}`;
-      if (last !== state) {
-        const [x, y, z] = worldPosition(position);
-        moving.bridge.position.z = z;
-        moving.carriage.position.x = x;
-        moving.ram.position.set(0, y, 0.132);
-        // The spindle is offset forward of the beam. Shift the beam so the stylus
-        // center and the programmed Y coordinate coincide, including at the rack.
-        moving.bridge.position.z -= 0.132;
+    render(machine, now) {
+      const { position, loaded, manualTool, artifact: hasArtifact, dock } = machine;
+      const moved = x !== position.x || y !== position.y || z !== position.z;
+      if (moved) {
+        ({ x, y, z } = position);
+        const [wx, wy, wz] = worldPosition(position);
+        moving.bridge.position.z = wz - frame.ramLead / 1000;
+        moving.carriage.position.x = wx;
+        moving.ram.position.set(0, wy, frame.ramLead / 1000);
+        dirty = shadowPending = true;
+      }
+      if (lastLoaded !== loaded || lastHeld !== manualTool) {
         active.forEach((tool, index) => { tool.visible = loaded === index + 1; });
-        parked.forEach((tool, index) => { tool.visible = loaded !== index + 1 && manualTool !== index + 1; });
-        artifact.visible = machine.artifact;
-        last = state;
-        dirty = true;
+        stations.forEach(({ stored }, index) => { stored.visible = loaded !== index + 1 && manualTool !== index + 1; });
+        lastLoaded = loaded;
+        lastHeld = manualTool;
+        dirty = shadowPending = true;
+      }
+      if (lastArtifact !== hasArtifact) {
+        artifact.visible = hasArtifact;
+        lastArtifact = hasArtifact;
+        dirty = shadowPending = true;
+      }
+      const opening = dock ? rackCoverOpening(y) : 0;
+      if (lastDock !== dock || lastOpening !== opening) {
+        if (lastDock && lastDock !== dock) stations[lastDock - 1].cover.scale.z = 1;
+        if (dock) stations[dock - 1].cover.scale.z = 1 - 0.96 * opening;
+        lastDock = dock;
+        lastOpening = opening;
+        dirty = shadowPending = true;
       }
       control.update();
+      if (webGL && shadowPending && (!moved || now >= nextShadow)) {
+        webGL.shadowMap.needsUpdate = dirty = true;
+        shadowPending = false;
+        nextShadow = now + 100;
+      }
       if (dirty) renderer.render(scene, camera);
       dirty = false;
     },

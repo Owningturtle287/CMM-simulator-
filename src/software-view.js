@@ -1,4 +1,4 @@
-import { Raycaster, Vector3 } from 'three';
+import { Matrix4, Raycaster, Vector3 } from 'three';
 
 const sun = new Vector3(-0.48, 0.79, 0.4).normalize();
 const fill = new Vector3(0.75, 0.45, -0.47).normalize();
@@ -114,16 +114,17 @@ export function createSoftwareView() {
   const direction = new Vector3();
   const raycaster = new Raycaster();
   const patterns = new WeakMap();
+  const projected = new WeakMap();
+  const viewProjection = new Matrix4();
+  const previousView = new Matrix4();
+  const backdrop = document.createElement('canvas');
+  const backgroundContext = backdrop.getContext('2d', { alpha: false });
+  let cameraRevision = 0;
+  let resetView = true;
 
-  function render(scene, camera) {
-    scene.updateMatrixWorld();
-    camera.updateMatrixWorld();
-    camera.getWorldDirection(direction);
+  function sceneBackground(project) {
+    const ctx = backgroundContext;
     ctx.setTransform(scale, 0, 0, scale, 0, 0);
-    const project = point => {
-      const p = point.clone().project(camera);
-      return { x: (p.x + 1) * width / 2, y: (1 - p.y) * height / 2, depth: p.z };
-    };
     const world = (x, y, z) => project(vertex(x, y, z));
     const background = ctx.createLinearGradient(0, 0, 0, height);
     background.addColorStop(0, '#edf1f5');
@@ -146,12 +147,31 @@ export function createSoftwareView() {
     for (let i = 11; i > 0; i--) {
       const edge = i * 0.018;
       outline(ctx, [
-        world(-0.83 - edge, -0.702, -0.88 - edge), world(0.96 + edge, -0.702, -0.88 - edge),
-        world(0.96 + edge, -0.702, 0.94 + edge), world(-0.83 - edge, -0.702, 0.94 + edge),
+        world(-0.86 - edge, -0.702, -0.98 - edge), world(0.95 + edge, -0.702, -0.98 - edge),
+        world(0.95 + edge, -0.702, 0.95 + edge), world(-0.86 - edge, -0.702, 0.95 + edge),
       ]);
       ctx.fillStyle = 'rgba(35,53,68,0.027)';
       ctx.fill();
     }
+  }
+
+  function render(scene, camera) {
+    scene.updateMatrixWorld();
+    camera.updateMatrixWorld();
+    viewProjection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    const project = point => {
+      const p = point.clone().applyMatrix4(viewProjection);
+      return { x: (p.x + 1) * width / 2, y: (1 - p.y) * height / 2, depth: p.z };
+    };
+    if (resetView || !previousView.equals(viewProjection)) {
+      previousView.copy(viewProjection);
+      camera.getWorldDirection(direction);
+      sceneBackground(project);
+      cameraRevision++;
+      resetView = false;
+    }
+    ctx.setTransform(scale, 0, 0, scale, 0, 0);
+    ctx.drawImage(backdrop, 0, 0, width, height);
 
     const surfaces = [];
     const solids = [];
@@ -160,29 +180,46 @@ export function createSoftwareView() {
       if (!mesh.isMesh) return;
       const { geometry, material, matrixWorld } = mesh;
       if (geometry.type === 'PlaneGeometry' && !material.transparent) return;
-      if (!material.transparent) solids.push(mesh);
-      if (geometry.type === 'SphereGeometry') {
-        const center = new Vector3().setFromMatrixPosition(matrixWorld);
-        const p = project(center);
-        const e = project(center.add(vertex(0, geometry.parameters.radius, 0)));
-        surfaces.push({ center: p, radius: Math.max(0.8, Math.hypot(p.x - e.x, p.y - e.y)), depth: p.depth });
-        return;
-      }
-      for (const points of facesFor(mesh)) {
-        const transformed = points.map(p => p.clone().applyMatrix4(matrixWorld));
-        const normal = transformed[1].clone().sub(transformed[0])
-          .cross(transformed[2].clone().sub(transformed[0])).normalize();
-        if (normal.dot(direction) > -0.00001) continue;
-        const face = transformed.map(project);
-        if (face.every(p => p.x < 0) || face.every(p => p.x > width) ||
-            face.every(p => p.y < 0) || face.every(p => p.y > height)) continue;
-        if (material.transparent) {
-          decals.push({ face, material, center: new Vector3().setFromMatrixPosition(matrixWorld) });
+      let entry = projected.get(mesh);
+      if (!entry || entry.revision !== cameraRevision || !entry.matrix.equals(matrixWorld)) {
+        entry = { revision: cameraRevision, matrix: matrixWorld.clone(), faces: [] };
+        projected.set(mesh, entry);
+        if (geometry.type === 'SphereGeometry') {
+          const center = new Vector3().setFromMatrixPosition(matrixWorld);
+          const p = project(center);
+          const e = project(center.add(vertex(0, geometry.parameters.radius, 0)));
+          const radius = Math.max(0.8, Math.hypot(p.x - e.x, p.y - e.y));
+          entry.faces.push({ center: p, radius, depth: p.depth });
         } else {
-          const depth = face.reduce((sum, p) => sum + p.depth, 0) / face.length;
-          surfaces.push({ face, normal, material, depth });
+          const bounds = { left: Infinity, right: -Infinity, top: Infinity, bottom: -Infinity };
+          for (const points of facesFor(mesh)) {
+            const transformed = points.map(p => p.clone().applyMatrix4(matrixWorld));
+            const normal = transformed[1].clone().sub(transformed[0])
+              .cross(transformed[2].clone().sub(transformed[0])).normalize();
+            if (normal.dot(direction) > -0.00001) continue;
+            const face = transformed.map(project);
+            if (face.every(p => p.x < 0) || face.every(p => p.x > width) ||
+                face.every(p => p.y < 0) || face.every(p => p.y > height)) continue;
+            if (material.transparent) {
+              const center = new Vector3().setFromMatrixPosition(matrixWorld);
+              entry.faces.push({ face, material, center, screen: project(center) });
+              continue;
+            }
+            for (const p of face) {
+              bounds.left = Math.min(bounds.left, p.x);
+              bounds.right = Math.max(bounds.right, p.x);
+              bounds.top = Math.min(bounds.top, p.y);
+              bounds.bottom = Math.max(bounds.bottom, p.y);
+            }
+            const depth = face.reduce((sum, p) => sum + p.depth, 0) / face.length;
+            entry.faces.push({ face, normal, material, depth });
+          }
+          if (!material.transparent && entry.faces.length) entry.solid = { mesh, bounds };
         }
       }
+      if (entry.solid) solids.push(entry.solid);
+      if (material.transparent) decals.push(...entry.faces);
+      else surfaces.push(...entry.faces);
     });
     surfaces.sort((a, b) => b.depth - a.depth);
     for (const surface of surfaces) {
@@ -194,10 +231,14 @@ export function createSoftwareView() {
         ctx.fill();
       } else drawFace(ctx, surface, patterns);
     }
-    for (const { face, material, center } of decals) {
-      raycaster.setFromCamera(center.clone().project(camera), camera);
+    for (const { face, material, center, screen } of decals) {
+      raycaster.setFromCamera(center.clone().applyMatrix4(viewProjection), camera);
       raycaster.far = raycaster.ray.origin.distanceTo(center) - 0.001;
-      if (!raycaster.intersectObjects(solids, false).length) drawDecal(ctx, material.map.image, face);
+      const candidates = solids.filter(({ bounds }) =>
+        screen.x >= bounds.left && screen.x <= bounds.right && screen.y >= bounds.top && screen.y <= bounds.bottom);
+      if (!raycaster.intersectObjects(candidates.map(({ mesh }) => mesh), false).length) {
+        drawDecal(ctx, material.map.image, face);
+      }
     }
   }
 
@@ -208,6 +249,9 @@ export function createSoftwareView() {
       height = h;
       domElement.width = Math.round(width * scale);
       domElement.height = Math.round(height * scale);
+      backdrop.width = domElement.width;
+      backdrop.height = domElement.height;
+      resetView = true;
     },
     render,
   };
