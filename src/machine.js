@@ -3,12 +3,14 @@ export const travel = { x: 900, y: 1200, z: 800 };
 export const maxRate = 250;
 export const probingRate = 8;
 export const frame = { originX: 450, originY: 840, ramLead: 132 };
-export const rack = { y: 1460, approach: 1315, plate: 386, safe: 550, halfWidth: 454, insertion: 4, separation: 31 };
+export const rack = { y: 1460, approach: 1315, plate: 386, safe: 550, halfWidth: 454, latchGap: 1.4, separation: 28 };
 export const axisTravel = { ...travel, y: rack.y };
 export const vastXT = { width: 91, depth: 91, height: 100, plateDiameter: 70 };
 export const stylusLength = 92;
 export const rackSeat = rack.plate - stylusLength;
+export const rackSlide = rackSeat + rack.latchGap;
 const acceleration = 830;
+const magnetMotion = 0.14;
 export const ports = [110, 246, 382, 518, 654, 790].map((x, index) => ({
   id: index + 1, x, diameter: [3, 2, 4, 5, 6, 8][index],
 }));
@@ -55,6 +57,14 @@ export class Machine {
   plan = null;
   dock = null;
   fault = '';
+
+  get adapterTransfer() {
+    const step = this.plan?.steps[this.plan.index];
+    if (!step?.adapter) return null;
+    const progress = clamp(1 - step.dwell / magnetMotion, 0, 1);
+    return progress > 0 ? { ...step.adapter, offset: progress * rack.latchGap } : null;
+  }
+
   touching = false;
   probing = false;
   message = 'Manual jog available. Drives on.';
@@ -129,10 +139,10 @@ export class Machine {
     if (this.loaded !== id) {
       if (this.loaded) {
         const current = ports.find(port => port.id === this.loaded);
-        steps.push(...this.dockingSteps(current, 'store'));
+        steps.push(...this.dockingSteps(current, true));
         steps.push(...this.socketExitSteps(false));
       }
-      steps.push(...this.dockingSteps(target, 'pick up'));
+      steps.push(...this.dockingSteps(target, false));
       steps.push(...this.socketExitSteps(true));
     }
     steps.push({ goal: { y: travel.y }, label: 'Leaving rear service travel' });
@@ -165,26 +175,26 @@ export class Machine {
   }
 
   socketExitSteps(loaded) {
-    // Leave a seated adapter on the socket rails until the magnetic state
-    // changes, and separate an empty receiver before withdrawing.
-    return [
-      { goal: { z: rackSeat + (loaded ? rack.insertion : rack.separation) }, label: 'Lifting clear of socket', rate: 78 },
-      { goal: { y: rack.approach }, label: 'Withdrawing from socket', rate: 140,
-        action: () => { this.dock = null; } },
+    const steps = [];
+    if (!loaded) {
+      steps.push({ goal: { z: rackSeat + rack.separation }, label: 'Lifting the empty receiver', rate: 78 });
+    }
+    steps.push(
+      { goal: { y: rack.approach }, label: loaded ? 'Sliding adapter out of socket' : 'Withdrawing the empty receiver',
+        rate: 130, action: () => { this.dock = null; } },
       { goal: { z: rack.safe }, label: 'Returning to clearance height', rate: 202 },
-    ];
+    );
+    return steps;
   }
 
-  dockingSteps(port, action) {
-    const storing = action === 'store';
+  dockingSteps(port, storing) {
     return [
       { goal: { x: port.x, y: rack.approach }, label: `Approaching port ${port.id}` },
-      { goal: { z: rackSeat + (storing ? rack.insertion : rack.separation) }, label: `Setting entry height for port ${port.id}`, rate: 180,
+      { goal: { z: rackSlide }, label: `Aligning with slot ${port.id}`, rate: 180,
         action: () => { this.dock = port.id; } },
-      { goal: { y: rack.y }, label: `Sliding into port ${port.id}`, rate: 120 },
-      { goal: { z: rackSeat }, label: `Seating at port ${port.id}`, rate: 44 },
+      { goal: { y: rack.y }, label: `Sliding into port ${port.id}`, rate: 115 },
       { goal: {}, label: storing ? `Releasing adapter at port ${port.id}` : `Coupling adapter at port ${port.id}`,
-        dwell: 0.36, action: () => { this.loaded = storing ? null : port.id; this.mountedStylus = 1; } },
+        dwell: 0.46, adapter: { id: port.id, releasing: storing }, action: () => { this.loaded = storing ? null : port.id; this.mountedStylus = 1; } },
     ];
   }
 

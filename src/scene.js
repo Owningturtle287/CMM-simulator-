@@ -4,7 +4,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { createSoftwareView } from './software-view.js';
-import { frame, ports, rack, rackCoverOpening, stylusLength, vastXT, workpiece, worldPosition } from './machine.js';
+import { frame, ports, rack, rackCoverOpening, startingPosition, stylusLength, vastXT, workpiece, worldPosition } from './machine.js';
 
 const logo = `${import.meta.env.BASE_URL}zeiss.svg`;
 const metal = (color, metalness, roughness, extra = {}) =>
@@ -121,8 +121,13 @@ function materials() {
     steel: metal(0x9eacb8, 0.99, 0.18),
     ceramic: metal(0xd9d6c7, 0.19, 0.25),
     ruby: new THREE.MeshPhysicalMaterial({ color: 0xa21239, roughness: 0.17, metalness: 0.2, clearcoat: 1 }),
-    probeShell: metal(0xa8adb2, 0.66, 0.31),
-    probeFace: metal(0x92979e, 0.39, 0.37),
+    probeShell: metal(0xb2b5ba, 0.65, 0.28, { roughnessMap: brush }),
+    probeFace: metal(0xc1c3c6, 0.39, 0.41),
+    probeCollar: metal(0x23282c, 0.3, 0.31),
+    plate: metal(0xc3c6c9, 0.92, 0.23, { roughnessMap: brush }),
+    plateInset: metal(0x293a33, 0.31, 0.41),
+    plateContact: metal(0xbaa574, 0.82, 0.29),
+    stylusCube: metal(0x55595a, 0.66, 0.32),
   };
 }
 
@@ -203,45 +208,176 @@ function buildBridge(scene, m, mark) {
   return { bridge, carriage, ram, stylus };
 }
 
+function facetedMesh(parent, material, faces) {
+  const geometry = new THREE.BufferGeometry();
+  const positions = [];
+  const uvs = [];
+  for (const face of faces) {
+    for (let i = 1; i < face.length - 1; i++) {
+      for (const point of [face[0], face[i], face[i + 1]]) {
+        positions.push(point.x, point.y, point.z);
+        uvs.push(point.x * 10 + 0.5, point.y * 10 + point.z * 3 + 0.5);
+      }
+    }
+  }
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.computeVertexNormals();
+  geometry.userData.canvasFaces = faces;
+  return addMesh(parent, geometry, material, 0, 0, 0);
+}
+
+function joinRings(rings) {
+  const first = rings[0];
+  const last = rings.at(-1);
+  const faces = [first.slice().reverse(), last];
+  for (let row = 1; row < rings.length; row++) {
+    const lower = rings[row - 1], upper = rings[row];
+    for (let i = 0; i < lower.length; i++) {
+      const next = (i + 1) % lower.length;
+      faces.push([lower[i], lower[next], upper[next], upper[i]]);
+    }
+  }
+  return faces;
+}
+
+function chamferedShell(parent, material, sections) {
+  const rings = sections.map(([y, width, depth, chamfer]) => {
+    const x = width / 2, z = depth / 2;
+    return [
+      [-x + chamfer, z], [x - chamfer, z], [x, z - chamfer], [x, -z + chamfer],
+      [x - chamfer, -z], [-x + chamfer, -z], [-x, -z + chamfer], [-x, z - chamfer],
+    ].map(([px, pz]) => new THREE.Vector3(px, y, pz));
+  });
+  return facetedMesh(parent, material, joinRings(rings));
+}
+
+function transverseFastener(parent, material, radius, depth, x, y, z, side = false) {
+  const fastener = cylinder(parent, material, radius, depth, x, y, z, 12);
+  if (side) fastener.rotation.z = Math.PI / 2;
+  else fastener.rotation.x = Math.PI / 2;
+  return fastener;
+}
+
 function buildVastHead(ram, m, mark) {
   const { width, depth, height } = vastXT;
   const head = group(ram, 0, stylusLength / 1000, 0);
-  const h = height / 1000;
-  box(head, m.probeShell, width / 1000, h - 0.013, depth / 1000, 0, 0.055, 0, 0.007);
-  box(head, m.black, 0.089, 0.016, 0.089, 0, 0.014, 0, 0.005);
-  box(head, m.probeShell, 0.081, 0.008, 0.079, 0, h - 0.003, 0, 0.003);
-  box(head, m.probeFace, 0.060, 0.087, 0.006, 0, 0.052, 0.044, 0.004);
-  for (const side of [-1, 1]) {
-    for (let groove = 0; groove < 4; groove++) {
-      const y = 0.031 + groove * 0.0076;
-      const fin = box(head, m.edge, 0.018, 0.0019, 0.003, side * 0.037, y, 0.0447, 0.0008);
-      fin.rotation.z = side * 0.20;
-    }
+  const w = width / 1000, d = depth / 1000, h = height / 1000;
+  const radius = 0.006;
+  const shell = [[0.021, w, d, radius]];
+  for (const y of [0.037, 0.046, 0.055, 0.064]) {
+    shell.push(
+      [y - 0.0015, w, d, radius],
+      [y - 0.00055, w - 0.0022, d - 0.0022, radius],
+      [y + 0.00055, w - 0.0022, d - 0.0022, radius],
+      [y + 0.0015, w, d, radius],
+    );
   }
-  cylinder(head, m.steel, 0.035, 0.006, 0, 0.003, 0, 28);
-  cylinder(head, m.black, 0.025, 0.001, 0, -0.0005, 0, 24);
-  decal(head, mark, 0.018, 0.018, 0, 0.072, 0.0478);
-  const vast = textMap('VAST', { width: 280, height: 92, color: '#8b6d37', font: 'italic 900 75px Arial' });
-  const xt = textMap('XT', { width: 110, height: 75, color: '#191b20', font: 'italic 900 67px Arial' });
-  decal(head, vast, 0.039, 0.013, -0.001, 0.038, 0.0478);
-  decal(head, xt, 0.010, 0.0068, 0.013, 0.0285, 0.0478);
+  shell.push([h - 0.011, w, d, radius]);
+  chamferedShell(head, m.probeShell, shell);
+  chamferedShell(head, m.probeCollar, [
+    [0.004, 0.078, 0.078, 0.006], [0.008, 0.088, 0.088, radius],
+    [0.019, w, d, radius], [0.022, w, d, radius],
+  ]);
+  chamferedShell(head, m.probeCollar, [
+    [h - 0.011, w, d, radius], [h - 0.005, w, d, radius],
+    [h, w - 0.003, d - 0.003, 0.004], [h + 0.005, 0.066, 0.070, 0.004],
+  ]);
+  const shield = [
+    [-0.037, 0.085], [-0.030, 0.027], [-0.023, 0.019], [0.023, 0.019],
+    [0.030, 0.027], [0.037, 0.085], [0.033, 0.089], [-0.033, 0.089],
+  ];
+  facetedMesh(head, m.probeFace, joinRings([0.0445, 0.0470].map(z =>
+    shield.map(([x, y]) => new THREE.Vector3(x, y, z)))));
+  for (const side of [-1, 1]) {
+    transverseFastener(head, m.steel, 0.0033, 0.001, side * 0.0452, 0.093, 0.015, true);
+    transverseFastener(head, m.rubber, 0.0017, 0.0011, side * 0.0460, 0.093, 0.015, true);
+  }
+  cylinder(head, m.probeCollar, 0.039, 0.005, 0, 0.005, 0, 36);
+  cylinder(head, m.steel, 0.0315, 0.004, 0, 0.002, 0, 36);
+  cylinder(head, m.plateInset, 0.024, 0.001, 0, 0.0003, 0, 28);
+  decal(head, mark, 0.019, 0.019, 0, 0.072, 0.0476);
+  const vast = textMap('VAST', { width: 280, height: 92, color: '#967339', font: 'italic 900 75px Arial' });
+  const xt = textMap('XT', { width: 110, height: 75, color: '#24292f', font: 'italic 900 67px Arial' });
+  decal(head, vast, 0.043, 0.014, -0.001, 0.041, 0.0476);
+  decal(head, xt, 0.011, 0.007, 0.014, 0.030, 0.0476);
 }
 
-function buildStylus(parent, m, port) {
+function buildAdapter(m, mark) {
+  const plate = new THREE.Group();
+  const radius = vastXT.plateDiameter / 2000;
+  const quarter = Math.PI / 2;
+  const fractionAngles = [
+    0, 0.036, 0.067, 0.15, 0.24, 0.33, 0.42, 0.51, 0.60, 0.69,
+    0.78, 0.87, 0.96, 1.05, 1.14, 1.23, 1.32, 1.41, quarter - 0.067, quarter - 0.036,
+  ];
+  const rings = [
+    [-0.012, radius - 0.0013, 0.0014], [-0.011, radius, 0.0018],
+    [-0.0068, radius, 0.0027], [-0.0057, radius - 0.0007, 0.0028],
+    [-0.0048, radius, 0.0028], [-0.0013, radius, 0.0028], [0, radius - 0.0011, 0.0028],
+  ].map(([y, outer, notch]) => [0, 1, 2, 3].flatMap(quadrant => fractionAngles.map(fraction => {
+    const angle = quadrant * quarter + fraction;
+    const cut = Math.min(fraction, quarter - fraction) < 0.05 ? notch : 0;
+    return new THREE.Vector3(Math.sin(angle) * (outer - cut), y, Math.cos(angle) * (outer - cut));
+  })));
+  const faces = joinRings(rings);
+  // Radial caps use a center fan so the four milled notches remain open.
+  for (const cap of faces.splice(0, 2)) {
+    const center = new THREE.Vector3(0, cap[0].y, 0);
+    for (let i = 0; i < cap.length; i++) faces.push([center, cap[i], cap[(i + 1) % cap.length]]);
+  }
+  const plateMesh = facetedMesh(plate, m.plate, faces);
+  const positions = plateMesh.geometry.getAttribute('position');
+  const normals = plateMesh.geometry.getAttribute('normal');
+  for (let i = 0; i < normals.count; i++) {
+    const x = positions.getX(i), z = positions.getZ(i);
+    if (Math.min(Math.abs(x), Math.abs(z)) < 0.003 || Math.abs(normals.getY(i)) > 0.99) continue;
+    // Smooth the turned rim while preserving the sharp edges of the milled slots.
+    const horizontal = Math.hypot(normals.getX(i), normals.getZ(i)) / Math.hypot(x, z);
+    normals.setXYZ(i, x * horizontal, normals.getY(i), z * horizontal);
+  }
+  plateMesh.geometry.userData.canvasFaces = joinRings([rings[0], rings[2], rings.at(-1)]
+    .map(ring => ring.filter((_, index) => (index % fractionAngles.length) % 3 === 0)));
+  cylinder(plate, m.plateInset, 0.0234, 0.00045, 0, 0.00016, 0, 32);
+  cylinder(plate, m.stylusCube, 0.0179, 0.00044, 0, 0.00039, 0, 28);
+  cylinder(plate, m.rubber, 0.0039, 0.0004, 0, 0.00068, 0, 16);
+  box(plate, m.steel, 0.0055, 0.00022, 0.0007, 0, 0.00095, 0).rotation.y = -0.40;
+  for (let i = 0; i < 3; i++) {
+    const angle = 0.38 + i * 2 * Math.PI / 3;
+    const x = Math.sin(angle) * 0.0128;
+    const z = Math.cos(angle) * 0.0128;
+    cylinder(plate, m.steel, 0.0026, 0.00055, x, 0.0008, z, 12);
+    cylinder(plate, m.stylusCube, 0.0010, 0.00045, x, 0.0011, z, 8);
+  }
+  for (let i = 0; i < 8; i++) {
+    const angle = (i + 0.5) * Math.PI / 4;
+    cylinder(plate, m.plateContact, 0.00072, 0.00045, Math.sin(angle) * 0.0206,
+      0.00051, Math.cos(angle) * 0.0206, 8);
+  }
+  decal(plate, mark, 0.0073, 0.0073, -0.0285, 0.0004, 0).rotation.x = -Math.PI / 2;
+  const torque = textMap('M = 2 Nm', { width: 280, height: 96, font: '650 65px Arial', color: '#282c31' });
+  decal(plate, torque, 0.015, 0.005, 0, 0.0004, -0.0279).rotation.x = -Math.PI / 2;
+  cylinder(plate, m.steel, 0.0238, 0.0034, 0, -0.0132, 0, 30);
+  cylinder(plate, m.stylusCube, 0.0155, 0.0045, 0, -0.0161, 0, 24);
+  const cube = group(plate, 0, -0.0275, 0);
+  cube.rotation.y = -Math.PI / 4;
+  box(cube, m.stylusCube, 0.022, 0.022, 0.022, 0, 0, 0, 0.002);
+  transverseFastener(cube, m.rubber, 0.0029, 0.0009, 0, 0, 0.0110);
+  transverseFastener(cube, m.rubber, 0.0029, 0.0009, 0.0110, 0, 0, true);
+  cylinder(plate, m.steel, 0.0055, 0.011, 0, -0.044, 0, 16, 0.0041);
+  return plate;
+}
+
+function buildStylus(parent, m, port, adapter) {
+  parent.add(adapter.clone());
   const length = stylusLength / 1000;
-  const plateRadius = vastXT.plateDiameter / 2000;
   const ball = port.diameter / 2000;
-  cylinder(parent, m.steel, plateRadius - 0.003, 0.006, 0, -0.003, 0, 28);
-  cylinder(parent, m.aluminum, plateRadius, 0.006, 0, -0.009, 0, 28);
-  cylinder(parent, m.steel, 0.023, 0.004, 0, -0.014, 0, 22);
-  box(parent, m.black, 0.022, 0.022, 0.022, 0, -0.026, 0, 0.002);
-  cylinder(parent, m.steel, 0.006, 0.012, 0, -0.042, 0, 14);
-  const shaftTop = 0.047;
+  const shaftTop = 0.049;
   cylinder(parent, m.steel, 0.0025, length - shaftTop - ball, 0, -(length + shaftTop - ball) / 2, 0, 12);
   addMesh(parent, new THREE.SphereGeometry(ball, 14, 10), m.ruby, 0, -length + ball, 0);
 }
 
-function buildRack(scene, m) {
+function buildRack(scene, m, adapter) {
   const [, , rear] = worldPosition({ x: frame.originX, y: rack.y, z: 0 });
   const rackGroup = group(scene, 0, 0, rear);
   const fixed = group(rackGroup);
@@ -259,10 +395,13 @@ function buildRack(scene, m) {
   const stations = ports.map(port => {
     const x = (port.x - frame.originX) / 1000;
     const seat = rack.plate / 1000;
-    box(fixed, m.black, 0.116, 0.028, 0.036, x, seat + 0.001, -0.066, 0.004);
+    box(fixed, m.black, 0.117, 0.028, 0.032, x, seat + 0.001, -0.069, 0.004);
     for (const side of [-1, 1]) {
-      box(fixed, m.black, 0.014, 0.028, 0.134, x + side * 0.051, seat + 0.001, -0.006, 0.003);
-      box(fixed, m.steel, 0.022, 0.008, 0.086, x + side * 0.041, seat - 0.016, -0.004, 0.002);
+      box(fixed, m.black, 0.012, 0.027, 0.137, x + side * 0.054, seat + 0.001, -0.004, 0.003);
+      box(fixed, m.probeCollar, 0.027, 0.018, 0.111, x + side * 0.044, seat - 0.018, 0.006, 0.003);
+      box(fixed, m.steel, 0.024, 0.003, 0.105, x + side * 0.043, seat - 0.0135, 0.003, 0.001);
+      const lip = box(fixed, m.steel, 0.020, 0.004, 0.016, x + side * 0.045, seat - 0.014, 0.059, 0.002);
+      lip.rotation.y = side * 0.18;
     }
     const label = decal(fixed, textMap(String(port.id), {
       width: 64, height: 64, background: '#dde2e8', font: '700 45px Arial',
@@ -274,7 +413,7 @@ function buildRack(scene, m) {
       box(cover, m.rubber, 0.09, 0.002, 0.004, 0, 0.003, 0.008 + rib * 0.012);
     }
     const stored = group(rackGroup, x, seat, 0);
-    buildStylus(stored, m, port);
+    buildStylus(stored, m, port, adapter);
     return { cover, stored };
   });
   return { fixed, stations };
@@ -331,7 +470,7 @@ function batchOpaque(root, moving = []) {
 const views = {
   iso: { eye: [3.1, 2.22, 4.22], target: [0, 0.75, 0.018], zoom: 1.00 },
   front: { eye: [0, 1.76, 5.3], target: [0, 0.75, 0.0], zoom: 1.00 },
-  rack: { eye: [1.32, 2.70, -4.34], target: [0, 0.24, -0.62], zoom: 2.60 },
+  rack: { eye: [0.28, 1.19, 3.21], target: [0, 0.34, -0.62], zoom: 2.62 },
 };
 
 export function createScene(container) {
@@ -408,11 +547,13 @@ export function createScene(container) {
   const base = group(scene);
   buildBase(base, m);
   const moving = buildBridge(scene, m, mark);
-  const { fixed: rackFrame, stations } = buildRack(scene, m);
+  const adapter = buildAdapter(m, mark);
+  if (webGL) batchOpaque(adapter);
+  const { fixed: rackFrame, stations } = buildRack(scene, m, adapter);
   const artifact = buildArtifact(scene, m);
   const active = ports.map(port => {
     const tool = group(moving.stylus, 0, stylusLength / 1000, 0);
-    buildStylus(tool, m, port);
+    buildStylus(tool, m, port, adapter);
     return tool;
   });
 
@@ -423,11 +564,7 @@ export function createScene(container) {
     batchOpaque(moving.ram, [moving.stylus]);
     batchOpaque(rackFrame);
     batchOpaque(artifact);
-    active.forEach(tool => batchOpaque(tool));
-    for (const { cover, stored } of stations) {
-      batchOpaque(cover);
-      batchOpaque(stored);
-    }
+    for (const { cover } of stations) batchOpaque(cover);
   }
 
   scene.traverse(object => {
@@ -436,11 +573,26 @@ export function createScene(container) {
     object.matrixAutoUpdate = false;
   });
 
+  let selectedView, probeCenter;
+  let position = startingPosition;
+  function probeFocus() {
+    const [x, y, z] = worldPosition(position);
+    return new THREE.Vector3(x, y + 0.096, z);
+  }
   const setView = name => {
-    const view = views[name] ?? views.iso;
-    camera.position.set(...view.eye);
-    control.target.set(...view.target);
-    camera.zoom = view.zoom;
+    selectedView = name;
+    control.maxZoom = name === 'probe' ? 18 : 3.9;
+    if (name === 'probe') {
+      probeCenter = probeFocus();
+      control.target.copy(probeCenter);
+      camera.position.copy(probeCenter).add(new THREE.Vector3(0.27, 0.11, 0.45));
+      camera.zoom = 10.25;
+    } else {
+      const view = views[name] ?? views.iso;
+      camera.position.set(...view.eye);
+      control.target.set(...view.target);
+      camera.zoom = view.zoom;
+    }
     camera.updateProjectionMatrix();
     control.update();
     dirty = true;
@@ -463,11 +615,13 @@ export function createScene(container) {
   resize();
 
   let x, y, z, lastLoaded, lastHeld, lastArtifact, lastDock, lastOpening;
+  let lastTransfer, lastOffset;
   let shadowPending = true, nextShadow = 0;
   return {
     setView,
     render(machine, now) {
-      const { position, loaded, manualTool, artifact: hasArtifact, dock } = machine;
+      const { loaded, manualTool, artifact: hasArtifact, dock } = machine;
+      position = machine.position;
       const moved = x !== position.x || y !== position.y || z !== position.z;
       if (moved) {
         ({ x, y, z } = position);
@@ -475,6 +629,13 @@ export function createScene(container) {
         moving.bridge.position.z = wz - frame.ramLead / 1000;
         moving.carriage.position.x = wx;
         moving.ram.position.set(0, wy, frame.ramLead / 1000);
+        if (selectedView === 'probe') {
+          const center = probeFocus();
+          const shift = center.clone().sub(probeCenter);
+          camera.position.add(shift);
+          control.target.add(shift);
+          probeCenter = center;
+        }
         dirty = shadowPending = true;
       }
       if (lastLoaded !== loaded || lastHeld !== manualTool) {
@@ -482,6 +643,18 @@ export function createScene(container) {
         stations.forEach(({ stored }, index) => { stored.visible = loaded !== index + 1 && manualTool !== index + 1; });
         lastLoaded = loaded;
         lastHeld = manualTool;
+        dirty = shadowPending = true;
+      }
+      const transfer = machine.adapterTransfer;
+      if (lastOffset !== transfer?.offset) {
+        if (lastTransfer) lastTransfer.part.position.y = lastTransfer.home;
+        if (transfer) {
+          const part = transfer.releasing ? active[transfer.id - 1] : stations[transfer.id - 1].stored;
+          const home = transfer.releasing ? stylusLength / 1000 : rack.plate / 1000;
+          part.position.y = home + (transfer.releasing ? -transfer.offset : transfer.offset) / 1000;
+          lastTransfer = { part, home };
+        } else lastTransfer = null;
+        lastOffset = transfer?.offset;
         dirty = shadowPending = true;
       }
       if (lastArtifact !== hasArtifact) {

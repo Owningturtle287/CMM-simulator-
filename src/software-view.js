@@ -39,11 +39,12 @@ function facesFor(mesh) {
   const geometry = mesh.geometry;
   if (!shapes.has(geometry)) {
     const data = geometry.parameters;
-    if (geometry.type === 'CylinderGeometry') shapes.set(geometry, cylinderShape(data));
+    if (geometry.userData.canvasFaces) shapes.set(geometry, geometry.userData.canvasFaces);
+    else if (geometry.type === 'CylinderGeometry') shapes.set(geometry, cylinderShape(data));
     else if (geometry.type === 'PlaneGeometry') {
       const x = data.width / 2, y = data.height / 2;
       shapes.set(geometry, [[vertex(-x,y,0), vertex(-x,-y,0), vertex(x,-y,0), vertex(x,y,0)]]);
-    } else if (data.width && data.height && data.depth) shapes.set(geometry, boxShape(data));
+    } else if (data?.width && data.height && data.depth) shapes.set(geometry, boxShape(data));
     else shapes.set(geometry, []);
   }
   return shapes.get(geometry);
