@@ -1,0 +1,15 @@
+{
+  "id": "./",
+  "name": "ACCURA CMM Simulator",
+  "short_name": "ACCURA CMM",
+  "description": "Interactive ACCURA bridge measuring machine and BP26SE-style control console",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f3f5f8",
+  "theme_color": "#f4f6f9",
+  "icons": [
+    { "src": "./icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "./icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
