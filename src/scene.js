@@ -264,7 +264,7 @@ function buildArtifact(scene, m) {
 const views = {
   iso: { eye: [3.1, 2.22, 4.22], target: [0, 0.75, 0.018], zoom: 1.00 },
   front: { eye: [0, 1.76, 5.3], target: [0, 0.75, 0.0], zoom: 1.00 },
-  rack: { eye: [0.34, 0.86, 0.12], target: [0, 0.24, -0.48], zoom: 2.46 },
+  rack: { eye: [1.32, 2.70, -4.20], target: [0, 0.24, -0.48], zoom: 2.60 },
 };
 
 export function createScene(container) {
