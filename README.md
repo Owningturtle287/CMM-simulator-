@@ -1,0 +1,38 @@
+# ZEISS ACCURA CMM Simulator
+
+An independent interactive simulation of an ACCURA bridge CMM and its BP26SE-style console. It runs in a WebGL 2 browser on desktop or iPhone and installs as a standalone web app. All machine motion, probing and the tool rack are simulated locally.
+
+## Run or install
+
+- [Open the simulator on GitHub Pages](https://owningturtle287.github.io/CMM-simulator-/)
+- On iPhone, open the link in Safari, tap Share, then **Add to Home Screen**. Enable **Open as Web App** and tap **Add**. Open it online once so it is available offline.
+- On desktop, use the same link. Chromium-based browsers offer installation through the address bar or browser menu.
+
+To run from source, use Node.js 22.12 or later.
+
+```sh
+npm ci
+npm run dev
+npm test
+npm run build
+```
+
+The **Deploy simulator to GitHub Pages** workflow tests and builds the app on pushes to `main` and on manual runs. Its publishing source is set in **Settings → Pages → Build and deployment → GitHub Actions**.
+
+## Operation
+
+- Drag the right joystick for X and Y and the left joystick for Z. The desktop keys W/A/S/D and Q/E and the compact iPhone touch controls also jog the machine. The operating-position key rotates the X/Y assignment for the operator’s side.
+- **M** toggles the drives. Pressing the mushroom latches the emergency stop immediately. Pressing it again simulates twisting it loose. The drives stay disabled until **M** is pressed. The joystick unlock buttons restore manual jogging after 60 seconds of inactivity.
+- Choose a station in the upper-right **Stylus rack** dropdown to run the rear-rack sequence in AUTO. The machine raises to clearance, returns the current system, picks up the requested stylus and retreats. **ESC** cancels travel. If the machine stops in a socket, another rack request or reference run starts by recovering clearance. The speed override also applies during automatic travel.
+- **M-Point** records the current 3D location. Clicking the center of the right joystick records an intermediate position. The included reference block supports a practice top-face contact at Z = 82 mm. The point log is kept for the current session.
+- **Shift → Return → F12** starts C99 reference travel. **F5/F6** with the same prefix select AUTO/MAN. The console menu contains position, velocity, status, probe controls and travel direction locks. The X/Y/Z keys adjust probe clamping and measuring force in MAN, independently of the travel direction locks.
+- Each of the six rack positions uses one straight-down stylus. The first is mounted on startup. The installed probe is fixed, and this configuration has no rotary table. Plain F1–F12 are host commands. Service-only controls and CALYPSO-dependent measurement programs, host shortcuts and scanning metrology are outside the scope of this simulator.
+
+The working envelope is 900 × 1,200 × 800 mm, using the documented ACCURA 9/12/8 variant. From the front, X increases to the right, Y away from the operator and Z away from the granite. Machine zero is at the lower front-left corner of the simulated measuring volume. The readout follows the virtual tip datum, and when unloaded it follows the corresponding nominal tip plane. Home parks X and Y at 0 and Z at 800 mm. Geometry and setup were modeled from reference photos. Docking clearances, practice contact and speed are simulation parameters.
+
+## References
+
+- [ZEISS BP26SE Control Console Operating Instructions, 61211-5080102](https://qualityforum.zeiss.com/migration/images/164_7f25a8672622a8cf52a1a9a44022dd04.pdf)
+- [ZEISS ACCURA specifications and measuring ranges](https://www.basstool.com/pdf/literature/zeiss/EN_Specifications_ACCURA.pdf)
+- [ZEISS Multi Sensor Rack overview](https://asset-downloads.zeiss.com/catalogs/download/iqs/7a9556cb-72be-4ed7-b5ef-da51d3d837e4/ZEISS_MSR_DINA4_V3.pdf.pdf)
+- [ZEISS logo file and attribution](https://commons.wikimedia.org/wiki/File:Zeiss_logo.svg)
