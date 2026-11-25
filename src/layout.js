@@ -108,7 +108,7 @@ export function layout() {
           </div>
         </div>
         <div id="viewport" class="viewport">
-          <div id="scene-error" role="status" hidden>3D view requires WebGL 2. The control console remains available.</div>
+          <div id="scene-error" role="status" hidden>Machine view is unavailable in this browser. The control console remains available.</div>
           <div class="stage-floor">
             <svg class="triad" viewBox="0 0 90 71" role="img" aria-label="Axis colors, X red, Y green, Z blue">
               <path d="M33 49V14m-4 5 4-5 4 5" stroke="#1b62bf"/><text x="30" y="11" fill="#1b62bf">Z</text>

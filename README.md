@@ -1,6 +1,6 @@
 # ZEISS ACCURA CMM Simulator
 
-An independent interactive simulation of an ACCURA bridge CMM and its BP26SE-style console. It runs in a WebGL 2 browser on desktop or iPhone and installs as a standalone web app. All machine motion, probing and the tool rack are simulated locally.
+An independent interactive simulation of an ACCURA bridge CMM and its BP26SE-style console. It runs in a browser on desktop or iPhone and installs as a standalone web app. WebGL 2 enables reflective materials and dynamic shadows, with a software-rendered view available when WebGL is disabled. All machine motion, probing and the tool rack are simulated locally.
 
 ## Run or install
 

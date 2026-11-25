@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { createSoftwareView } from './software-view.js';
 import { ports, rack, stylusLength, workpiece, worldPosition } from './machine.js';
 
 const logo = `${import.meta.env.BASE_URL}zeiss.svg`;
@@ -267,12 +268,24 @@ const views = {
 };
 
 export function createScene(container) {
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFShadowMap;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.17;
+  const canvas = document.createElement('canvas');
+  const options = { antialias: true, alpha: false, powerPreference: 'high-performance' };
+  const context = canvas.getContext('webgl2', options);
+  let webGL;
+  if (context) {
+    try {
+      webGL = new THREE.WebGLRenderer({ canvas, context, ...options });
+      webGL.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+      webGL.shadowMap.enabled = true;
+      webGL.shadowMap.type = THREE.PCFShadowMap;
+      webGL.toneMapping = THREE.ACESFilmicToneMapping;
+      webGL.toneMappingExposure = 1.17;
+    } catch (error) {
+      webGL = undefined;
+      console.warn('Switching to the software view', error);
+    }
+  }
+  const renderer = webGL ?? createSoftwareView();
   renderer.domElement.setAttribute('aria-label', 'Interactive 3D model of the ZEISS ACCURA');
   container.prepend(renderer.domElement);
   const scene = new THREE.Scene();
@@ -288,12 +301,14 @@ export function createScene(container) {
   let dirty = true;
   control.addEventListener('change', () => { dirty = true; });
 
-  const room = new RoomEnvironment();
-  const pmrem = new THREE.PMREMGenerator(renderer);
-  scene.environment = pmrem.fromScene(room, 0.055).texture;
-  scene.environmentIntensity = 0.82;
-  room.dispose();
-  pmrem.dispose();
+  if (webGL) {
+    const room = new RoomEnvironment();
+    const pmrem = new THREE.PMREMGenerator(webGL);
+    scene.environment = pmrem.fromScene(room, 0.055).texture;
+    scene.environmentIntensity = 0.82;
+    room.dispose();
+    pmrem.dispose();
+  }
   scene.add(new THREE.HemisphereLight(0xf3f8ff, 0x929da8, 1.8));
   const key = new THREE.DirectionalLight(0xfff8ef, 2.5);
   key.position.set(-3.1, 5.4, 3.2);
