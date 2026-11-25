@@ -262,9 +262,9 @@ function buildArtifact(scene, m) {
 }
 
 const views = {
-  iso: { eye: [3.1, 2.22, 4.22], target: [0, 0.64, 0.018], zoom: 1.03 },
-  front: { eye: [0, 1.76, 5.3], target: [0, 0.63, 0.0], zoom: 1.04 },
-  rack: { eye: [1.08, 1.19, 1.26], target: [0, 0.39, -0.49], zoom: 2.05 },
+  iso: { eye: [3.1, 2.22, 4.22], target: [0, 0.75, 0.018], zoom: 1.00 },
+  front: { eye: [0, 1.76, 5.3], target: [0, 0.75, 0.0], zoom: 1.00 },
+  rack: { eye: [0.34, 0.86, 0.12], target: [0, 0.24, -0.48], zoom: 2.46 },
 };
 
 export function createScene(container) {
@@ -359,7 +359,7 @@ export function createScene(container) {
     const { clientWidth: width, clientHeight: height } = container;
     if (!height || !width) return;
     const ratio = width / height;
-    const halfHeight = Math.max(1.44, 1.25 / ratio);
+    const halfHeight = Math.max(1.62, 1.25 / ratio);
     camera.top = halfHeight;
     camera.bottom = -halfHeight;
     camera.left = -halfHeight * ratio;

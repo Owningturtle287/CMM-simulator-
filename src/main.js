@@ -221,8 +221,13 @@ $$('[data-jog]').forEach(button => {
 
 document.addEventListener('keydown', event => {
   if (event.metaKey || event.altKey || event.ctrlKey || dialog.open) return;
+  if (event.key === 'Escape' && machine.plan) {
+    event.preventDefault();
+    command('esc');
+    return;
+  }
   if (event.target.matches('input, select, textarea')) return;
-  if (['Enter', ' '].includes(event.key) && event.target.closest('button')) return;
+  if (!event.shiftKey && ['Enter', ' '].includes(event.key) && event.target.closest('button')) return;
   if (bindings[event.code] && !controller.editor) {
     event.preventDefault();
     if (!event.repeat) hotkeys.add(event.code);
@@ -253,6 +258,7 @@ document.addEventListener('keyup', event => {
 });
 window.addEventListener('blur', releaseInputs);
 document.addEventListener('visibilitychange', () => {
+  lastFrame = performance.now();
   if (document.hidden) releaseInputs();
 });
 
@@ -340,9 +346,11 @@ function updateUI() {
 let lastFrame = performance.now();
 let lastUI = 0;
 function frame(now) {
-  const seconds = Math.max(0, Math.min(0.05, (now - lastFrame) / 1000));
+  const seconds = Math.max(0, Math.min(0.50, (now - lastFrame) / 1000));
   lastFrame = now;
-  machine.update(seconds, readInput());
+  const steps = Math.max(1, Math.ceil(seconds / 0.05));
+  const input = readInput();
+  for (let step = 0; step < steps; step++) machine.update(seconds / steps, input);
   scene?.render(machine);
   if (now - lastUI > 45) { updateUI(); lastUI = now; }
   window.requestAnimationFrame(frame);

@@ -1,4 +1,4 @@
-import { Vector3 } from 'three';
+import { Raycaster, Vector3 } from 'three';
 
 const sun = new Vector3(-0.48, 0.79, 0.4).normalize();
 const fill = new Vector3(0.75, 0.45, -0.47).normalize();
@@ -65,19 +65,20 @@ function drawDecal(ctx, image, [a, b, , d]) {
   ctx.restore();
 }
 
-function drawFace(ctx, surface) {
+function drawFace(ctx, surface, patterns) {
   const { face, normal, material } = surface;
-  if (material.transparent && material.map) {
-    drawDecal(ctx, material.map.image, face);
-    return;
-  }
   const light = Math.max(0, normal.dot(sun));
   const rim = Math.max(0, normal.dot(fill));
   outline(ctx, face);
   if (material.map?.isCanvasTexture) {
-    const pattern = ctx.createPattern(material.map.image, 'repeat');
+    const image = material.map.image;
+    if (!patterns.has(image)) {
+      const pattern = ctx.createPattern(image, 'repeat');
+      pattern?.setTransform(new DOMMatrix().scale(0.29));
+      patterns.set(image, pattern);
+    }
+    const pattern = patterns.get(image);
     if (pattern) {
-      pattern.setTransform(new DOMMatrix().scale(0.29));
       ctx.fillStyle = pattern;
       ctx.fill();
     }
@@ -111,6 +112,8 @@ export function createSoftwareView() {
   const scale = Math.min(window.devicePixelRatio, 1.5);
   let width = 1, height = 1;
   const direction = new Vector3();
+  const raycaster = new Raycaster();
+  const patterns = new WeakMap();
 
   function render(scene, camera) {
     scene.updateMatrixWorld();
@@ -151,10 +154,13 @@ export function createSoftwareView() {
     }
 
     const surfaces = [];
+    const solids = [];
+    const decals = [];
     scene.traverseVisible(mesh => {
       if (!mesh.isMesh) return;
       const { geometry, material, matrixWorld } = mesh;
       if (geometry.type === 'PlaneGeometry' && !material.transparent) return;
+      if (!material.transparent) solids.push(mesh);
       if (geometry.type === 'SphereGeometry') {
         const center = new Vector3().setFromMatrixPosition(matrixWorld);
         const p = project(center);
@@ -168,8 +174,14 @@ export function createSoftwareView() {
           .cross(transformed[2].clone().sub(transformed[0])).normalize();
         if (normal.dot(direction) > -0.00001) continue;
         const face = transformed.map(project);
-        const depth = face.reduce((sum, p) => sum + p.depth, 0) / face.length - (material.transparent ? 0.00025 : 0);
-        surfaces.push({ face, normal, material, depth });
+        if (face.every(p => p.x < 0) || face.every(p => p.x > width) ||
+            face.every(p => p.y < 0) || face.every(p => p.y > height)) continue;
+        if (material.transparent) {
+          decals.push({ face, material, center: new Vector3().setFromMatrixPosition(matrixWorld) });
+        } else {
+          const depth = face.reduce((sum, p) => sum + p.depth, 0) / face.length;
+          surfaces.push({ face, normal, material, depth });
+        }
       }
     });
     surfaces.sort((a, b) => b.depth - a.depth);
@@ -180,7 +192,12 @@ export function createSoftwareView() {
         ctx.arc(x, y, surface.radius, 0, 2 * Math.PI);
         ctx.fillStyle = '#ab1440';
         ctx.fill();
-      } else drawFace(ctx, surface);
+      } else drawFace(ctx, surface, patterns);
+    }
+    for (const { face, material, center } of decals) {
+      raycaster.setFromCamera(center.clone().project(camera), camera);
+      raycaster.far = raycaster.ray.origin.distanceTo(center) - 0.001;
+      if (!raycaster.intersectObjects(solids, false).length) drawDecal(ctx, material.map.image, face);
     }
   }
 
