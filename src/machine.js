@@ -1,3 +1,5 @@
+import { fitReferenceSphere, masterQualificationSteps, referenceSphere } from './calibration.js';
+
 export const axes = ['x', 'y', 'z'];
 export const travel = { x: 900, y: 1200, z: 800 };
 export const maxRate = 250;
@@ -11,9 +13,25 @@ export const rackSeat = rack.plate - stylusLength;
 export const rackSlide = rackSeat + rack.latchGap;
 const acceleration = 830;
 const magnetMotion = 0.14;
-export const ports = [110, 246, 382, 518, 654, 790].map((x, index) => ({
-  id: index + 1, x, diameter: [3, 2, 4, 5, 6, 8][index],
+const masterMount = 38.5;
+const masterLength = 63.5;
+export const masterStylus = {
+  id: 6, name: 'Master probe', diameter: 8, shaftDiameter: 6, bodyDiameter: 11,
+  componentLength: masterLength, measuringLength: 50.5, mount: masterMount, length: masterMount + masterLength,
+};
+export const ports = [
+  { x: 110, diameter: 3, shaftDiameter: 2.2 },
+  { x: 246, diameter: 2, shaftDiameter: 1.4 },
+  { x: 382, diameter: 4, shaftDiameter: 2.9 },
+  { x: 518, diameter: 5, shaftDiameter: 3.8 },
+  { x: 654, diameter: 6, shaftDiameter: 4.5 },
+  { x: 790, ...masterStylus },
+].map((stylus, index) => ({
+  id: index + 1, name: `Stylus ${String(index + 1).padStart(2, '0')}`, length: stylusLength, ...stylus,
 }));
+
+export const stylusLabel = stylus => `${stylus.name} · Ø${stylus.diameter} mm`;
+
 export const workpiece = { x: 450, y: 655, width: 280, depth: 190, top: 82 };
 export const startingPosition = { x: 450, y: 655, z: 530 };
 const referencePosition = { x: 0, y: 0, z: 800 };
@@ -57,6 +75,16 @@ export class Machine {
   plan = null;
   dock = null;
   fault = '';
+  calibration = null;
+
+  get tipOffset() {
+    return stylusLength - (ports[this.loaded - 1]?.length ?? stylusLength);
+  }
+
+  get tipPosition() {
+    return { ...this.position, z: this.position.z + this.tipOffset };
+  }
+
 
   get adapterTransfer() {
     const step = this.plan?.steps[this.plan.index];
@@ -116,7 +144,9 @@ export class Machine {
 
   abort() {
     if (!this.plan) return false;
+    if (this.plan.calibrating) this.calibration.state = 'cancelled';
     this.plan = null;
+    this.touching = false;
     this.clearVelocity();
     this.report('Automatic travel cancelled.');
     return true;
@@ -129,24 +159,53 @@ export class Machine {
     return true;
   }
 
+  canSelectStylus(id) {
+    if (!this.canStart()) return false;
+    if (this.mode !== 'AUTO') return this.report('Switch to AUTO before starting a stylus action.');
+    if (this.manualTool === id) return this.report('Remount the hand-held stylus system before continuing.');
+    return true;
+  }
+
   startChange(id) {
     const target = ports.find(port => port.id === id);
-    if (!target || !this.canStart()) return false;
-    if (this.mode !== 'AUTO') return this.report('Switch to AUTO before changing stylus systems.');
-    if (this.manualTool === id) return this.report('Remount the hand-held stylus before using its port.');
-    if (this.loaded === id && !this.dock) return this.report('That stylus is already mounted.');
-    const steps = this.clearanceSteps();
-    if (this.loaded !== id) {
-      if (this.loaded) {
-        const current = ports.find(port => port.id === this.loaded);
-        steps.push(...this.dockingSteps(current, true));
-        steps.push(...this.socketExitSteps(false));
-      }
-      steps.push(...this.dockingSteps(target, false));
-      steps.push(...this.socketExitSteps(true));
-    }
+    if (!target || !this.canSelectStylus(id)) return false;
+    if (this.loaded === id && !this.dock) return this.report('That stylus system is already mounted.');
+    const steps = this.changeSteps(target);
     steps.push({ goal: { y: travel.y }, label: 'Leaving rear service travel' });
-    this.plan = { steps, index: 0, finish: 'Stylus change complete.' };
+    return this.startPlan(steps, 'Stylus change complete.');
+  }
+
+  startMasterCalibration() {
+    if (!this.canSelectStylus(masterStylus.id)) return false;
+    const contacts = [];
+    const calibration = { state: 'running', contacts: 0, scans: 0, sphere: null };
+    const steps = this.changeSteps(ports[masterStylus.id - 1]);
+    steps.push(
+      { goal: { x: referenceSphere.x, y: referenceSphere.y }, label: 'Travelling to the reference sphere' },
+      { goal: { z: referenceSphere.z + 85 }, label: 'Setting reference sphere clearance' },
+    );
+    steps.push(...masterQualificationSteps(masterStylus, stylusLength - masterStylus.length, () => {
+      contacts.push(this.tipPosition);
+      calibration.contacts = contacts.length;
+      if (contacts.length === 5) calibration.sphere = fitReferenceSphere(contacts, masterStylus.diameter / 2);
+    }, () => { calibration.scans++; }));
+    this.calibration = calibration;
+    return this.startPlan(steps, 'Master probe calibration complete.', true);
+  }
+
+  changeSteps(target) {
+    const steps = this.clearanceSteps();
+    if (this.loaded === target.id) return steps;
+    if (this.loaded) {
+      steps.push(...this.dockingSteps(ports[this.loaded - 1], true), ...this.socketExitSteps(false));
+    }
+    steps.push(...this.dockingSteps(target, false), ...this.socketExitSteps(true));
+    return steps;
+  }
+
+  startPlan(steps, finish, calibrating = false) {
+    this.touching = false;
+    this.plan = { steps, index: 0, finish, calibrating };
     this.report(steps[0].label);
     return true;
   }
@@ -159,9 +218,7 @@ export class Machine {
       { goal: { y: referencePosition.y }, label: 'Referencing Y' },
       { goal: { x: referencePosition.x }, label: 'Referencing X' },
     );
-    this.plan = { steps, index: 0, finish: 'Reference position reached.' };
-    this.report(steps[0].label);
-    return true;
+    return this.startPlan(steps, 'Reference position reached.');
   }
 
   clearanceSteps() {
@@ -189,11 +246,11 @@ export class Machine {
 
   dockingSteps(port, storing) {
     return [
-      { goal: { x: port.x, y: rack.approach }, label: `Approaching port ${port.id}` },
+      { goal: { x: port.x, y: rack.approach }, label: `Approaching holder ${port.id}` },
       { goal: { z: rackSlide }, label: `Aligning with slot ${port.id}`, rate: 180,
         action: () => { this.dock = port.id; } },
-      { goal: { y: rack.y }, label: `Sliding into port ${port.id}`, rate: 115 },
-      { goal: {}, label: storing ? `Releasing adapter at port ${port.id}` : `Coupling adapter at port ${port.id}`,
+      { goal: { y: rack.y }, label: `Sliding into holder ${port.id}`, rate: 115 },
+      { goal: {}, label: storing ? `Releasing adapter at holder ${port.id}` : `Coupling adapter at holder ${port.id}`,
         dwell: 0.46, adapter: { id: port.id, releasing: storing }, action: () => { this.loaded = storing ? null : port.id; this.mountedStylus = 1; } },
     ];
   }
@@ -201,6 +258,9 @@ export class Machine {
   manualStylus(mount) {
     if (this.plan || this.dock) return this.report('Clear the rack before handling a stylus.');
     if (mount && !this.loaded && this.manualTool) {
+      if (this.position.z + stylusLength < ports[this.manualTool - 1].length) {
+        return this.report('Raise Z before mounting the stylus system.');
+      }
       this.loaded = this.manualTool;
       this.manualTool = null;
       this.mountedStylus = 1;
@@ -217,7 +277,7 @@ export class Machine {
   recordPoint(kind) {
     if (this.plan || this.stopped || this.fault || !this.drives) return this.report('Point recording is unavailable in the current machine state.');
     if (kind === 'Measurement' && !this.loaded) return this.report('Mount a stylus before recording a point.');
-    this.points.unshift({ ...this.position, kind, tool: this.loaded });
+    this.points.unshift({ ...this.tipPosition, kind, tool: this.loaded });
     this.report(`${kind} point recorded.`);
     return true;
   }
@@ -241,26 +301,44 @@ export class Machine {
       step.velocity = 0;
       return;
     }
-    const dx = (step.goal.x ?? this.position.x) - this.position.x;
-    const dy = (step.goal.y ?? this.position.y) - this.position.y;
-    const dz = (step.goal.z ?? this.position.z) - this.position.z;
-    const distance = Math.hypot(dx, dy, dz);
-    if (distance > 0) {
-      step.velocity = Math.min(rate, (step.velocity ?? 0) + acceleration * seconds, Math.sqrt(2 * acceleration * distance));
-      const fraction = Math.min(1, step.velocity * seconds / distance);
-      if (fraction < 1) {
-        this.position.x += dx * fraction;
-        this.position.y += dy * fraction;
-        this.position.z += dz * fraction;
-        return;
+    this.touching = false;
+    if (step.circle) {
+      const circle = step.circle;
+      const length = 2 * Math.PI * circle.radius;
+      circle.distance = Math.min(length, circle.distance + rate * seconds);
+      const angle = circle.direction * circle.distance / circle.radius;
+      this.position.x = circle.x + circle.radius * Math.cos(angle);
+      this.position.y = circle.y + circle.radius * Math.sin(angle);
+      this.position.z = circle.z;
+      this.touching = true;
+      this.probing = true;
+      if (circle.distance < length) return;
+    } else {
+      const dx = (step.goal.x ?? this.position.x) - this.position.x;
+      const dy = (step.goal.y ?? this.position.y) - this.position.y;
+      const dz = (step.goal.z ?? this.position.z) - this.position.z;
+      const distance = Math.hypot(dx, dy, dz);
+      if (distance > 0) {
+        step.velocity = Math.min(rate, (step.velocity ?? 0) + acceleration * seconds, Math.sqrt(2 * acceleration * distance));
+        const fraction = Math.min(1, step.velocity * seconds / distance);
+        if (fraction < 1) {
+          this.position.x += dx * fraction;
+          this.position.y += dy * fraction;
+          this.position.z += dz * fraction;
+          return;
+        }
+        Object.assign(this.position, step.goal);
       }
-      Object.assign(this.position, step.goal);
+      this.touching = Boolean(step.contact);
+      this.probing = this.touching;
     }
     step.dwell = (step.dwell ?? 0) - seconds;
     if (step.dwell > 0) return;
     step.action?.();
     this.plan.index += 1;
     if (this.plan.index === steps.length) {
+      if (this.plan.calibrating) this.calibration.state = 'complete';
+      this.touching = false;
       this.report(this.plan.finish);
       this.plan = null;
     } else this.report(steps[this.plan.index].label);
@@ -284,7 +362,8 @@ export class Machine {
         magnitude < 0.37 ? probingRate * (magnitude - 0.09) / 0.28 :
           magnitude <= 0.58 ? probingRate : probingRate + (maxRate - probingRate) * (magnitude - 0.58) / 0.42;
       this.probing ||= rate <= probingRate && cap > 0;
-      next[axis] = clamp(next[axis] + Math.sign(value) * Math.min(rate, cap) * seconds, 0, axisTravel[axis]);
+      const minimum = axis === 'z' ? Math.max(0, -this.tipOffset) : 0;
+      next[axis] = clamp(next[axis] + Math.sign(value) * Math.min(rate, cap) * seconds, minimum, axisTravel[axis]);
     }
     this.applyJog(next);
   }
@@ -301,13 +380,43 @@ export class Machine {
       this.report('Rack obstruction. Select SLOW and jog away.');
       return;
     }
-    const inWorkpiece = this.loaded && this.artifact &&
+    const tipOffset = this.tipOffset;
+    const stylus = ports[this.loaded - 1];
+    const sphereRadius = referenceSphere.diameter / 2;
+    const horizontal = Math.hypot(next.x - referenceSphere.x, next.y - referenceSphere.y);
+    if (horizontal < sphereRadius + headHalf && next.z + stylusLength < referenceSphere.z + sphereRadius) {
+      this.fault = 'Reference sphere obstruction';
+      this.report('Reference sphere obstruction. Select SLOW and jog away.');
+      return;
+    }
+    if (stylus) {
+      const rubyRadius = stylus.diameter / 2;
+      const ballZ = next.z + tipOffset + rubyRadius;
+      const contactRadius = sphereRadius + rubyRadius;
+      const touchesSphere = Math.hypot(horizontal, ballZ - referenceSphere.z) < contactRadius;
+      if (touchesSphere && next.z < this.position.z && next.x === this.position.x && next.y === this.position.y &&
+          this.position.z + tipOffset + rubyRadius >= referenceSphere.z) {
+        next.z = referenceSphere.z + Math.sqrt(contactRadius ** 2 - horizontal ** 2) - rubyRadius - tipOffset;
+        this.position = next;
+        if (!this.touching) this.report('Stylus contacted the reference sphere.');
+        this.touching = true;
+        return;
+      }
+      const hitsBase = horizontal < referenceSphere.baseRadius + rubyRadius && next.z + tipOffset < 18;
+      const hitsHolder = horizontal < 22 + rubyRadius && next.z + tipOffset < referenceSphere.z - sphereRadius;
+      const shaftInterference = horizontal < sphereRadius + stylus.shaftDiameter / 2 && ballZ < referenceSphere.z;
+      if (touchesSphere || hitsBase || hitsHolder || shaftInterference) {
+        this.fault = 'Reference sphere obstruction';
+        this.report('Reference sphere obstruction. Select SLOW and jog away.');
+        return;
+      }
+    }
+    const inWorkpiece = stylus && this.artifact &&
       Math.abs(next.x - workpiece.x) <= workpiece.width / 2 &&
       Math.abs(next.y - workpiece.y) <= workpiece.depth / 2;
-    if (inWorkpiece && next.z < workpiece.top) {
-      const descending = this.position.z >= workpiece.top;
-      if (descending) {
-        this.position = { ...next, z: workpiece.top };
+    if (inWorkpiece && next.z + tipOffset < workpiece.top) {
+      if (this.position.z + tipOffset >= workpiece.top) {
+        this.position = { ...next, z: workpiece.top - tipOffset };
         if (!this.touching) this.report('Stylus contact. Press M-Point to accept the point.');
         this.touching = true;
       } else {
@@ -316,7 +425,7 @@ export class Machine {
       }
       return;
     }
-    if (!inWorkpiece || next.z > workpiece.top) this.touching = false;
+    this.touching = false;
     if (this.fault) {
       this.fault = '';
       this.report('Collision cleared.');

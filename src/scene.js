@@ -4,6 +4,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { createSoftwareView } from './software-view.js';
+import { referenceSphere } from './calibration.js';
 import { frame, ports, rack, rackCoverOpening, startingPosition, stylusLength, vastXT, workpiece, worldPosition } from './machine.js';
 
 const logo = `${import.meta.env.BASE_URL}zeiss.svg`;
@@ -119,7 +120,12 @@ function materials() {
     rubber: metal(0x101518, 0.0, 0.72),
     aluminum: metal(0xbfcbd4, 0.85, 0.29, { roughnessMap: brush }),
     steel: metal(0x9eacb8, 0.99, 0.18),
-    ceramic: metal(0xd9d6c7, 0.19, 0.25),
+    ram: metal(0x535045, 0.52, 0.42, { roughnessMap: brush }),
+    ramEdge: metal(0x827d6a, 0.62, 0.36, { roughnessMap: brush }),
+    referenceCeramic: metal(0xf2e5bf, 0.0, 0.32),
+    referenceStand: metal(0x21262a, 0.32, 0.43),
+    markRed: metal(0xa41620, 0.13, 0.30),
+    carbide: metal(0x626c70, 0.82, 0.28),
     ruby: new THREE.MeshPhysicalMaterial({ color: 0xa21239, roughness: 0.17, metalness: 0.2, clearcoat: 1 }),
     probeShell: metal(0xb2b5ba, 0.65, 0.28, { roughnessMap: brush }),
     probeFace: metal(0xc1c3c6, 0.39, 0.41),
@@ -204,10 +210,12 @@ function buildBridge(scene, m, mark) {
   for (let i = 0; i < 4; i++) box(housing, m.edge, 0.038, 0.004, 0.001, -0.056, 0.820 - i * 0.012, 0.109);
   decal(housing, mark, 0.082, 0.082, 0, 0.433, 0.110);
 
-  cylinder(carriage, m.black, 0.045, 0.018, 0, 1.021, ramOffset, 24);
+  box(carriage, m.black, 0.088, 0.020, 0.085, 0, 1.021, ramOffset, 0.004);
   const ram = group(carriage, 0, 0, ramOffset);
-  cylinder(ram, m.ceramic, 0.034, 0.868, 0, 0.630, 0, 24);
-  cylinder(ram, m.steel, 0.035, 0.010, 0, 0.200, 0, 24);
+  box(ram, m.ram, 0.076, 0.862, 0.072, 0, 0.633, 0, 0.002);
+  box(ram, m.ramEdge, 0.0010, 0.850, 0.004, 0.0382, 0.634, 0.031, 0.0005);
+  box(ram, m.ram, 0.079, 0.018, 0.076, 0, 0.202, 0, 0.002);
+  transverseFastener(ram, m.steel, 0.0018, 0.0009, -0.018, 0.203, 0.038);
   buildVastHead(ram, m, mark);
   const stylus = group(ram);
   return { bridge, carriage, ram, stylus };
@@ -369,17 +377,22 @@ function buildAdapter(m, mark) {
   box(cube, m.stylusCube, 0.022, 0.022, 0.022, 0, 0, 0, 0.002);
   transverseFastener(cube, m.rubber, 0.0029, 0.0009, 0, 0, 0.0110);
   transverseFastener(cube, m.rubber, 0.0029, 0.0009, 0.0110, 0, 0, true);
-  cylinder(plate, m.steel, 0.0055, 0.011, 0, -0.044, 0, 16, 0.0041);
   return plate;
 }
 
 function buildStylus(parent, m, port, adapter) {
   parent.add(adapter.clone());
-  const length = stylusLength / 1000;
+  const length = port.length / 1000;
   const ball = port.diameter / 2000;
-  const shaftTop = 0.049;
-  cylinder(parent, m.steel, 0.0025, length - shaftTop - ball, 0, -(length + shaftTop - ball) / 2, 0, 12);
-  addMesh(parent, new THREE.SphereGeometry(ball, 14, 10), m.ruby, 0, -length + ball, 0);
+  const shaftTop = port.measuringLength ? length - port.measuringLength / 1000 : 0.049;
+  const mount = (port.mount ?? 38.5) / 1000;
+  const body = (port.bodyDiameter ?? 11) / 2000;
+  cylinder(parent, m.steel, body, shaftTop - mount, 0, -(shaftTop + mount) / 2, 0, 16, body - 0.0014);
+  const shaftMaterial = port.measuringLength ? m.carbide : m.steel;
+  cylinder(parent, shaftMaterial, port.shaftDiameter / 2000, length - shaftTop - ball,
+    0, -(length + shaftTop - ball) / 2, 0, 14);
+  addMesh(parent, new THREE.SphereGeometry(ball, 18, 12), m.ruby, 0, -length + ball, 0);
+  if (port.measuringLength) transverseFastener(parent, m.markRed, 0.0032, 0.0005, 0.001, -0.007, 0.0348);
 }
 
 function buildRack(scene, m, adapter) {
@@ -422,6 +435,26 @@ function buildRack(scene, m, adapter) {
     return { cover, stored };
   });
   return { fixed, stations };
+}
+
+function buildReferenceSphere(scene, m, mark) {
+  const [x, y, z] = worldPosition({ ...referenceSphere, z: 0 });
+  const fixture = group(scene, x, y, z);
+  const black = m.referenceStand;
+  const radius = referenceSphere.diameter / 2000;
+  const center = referenceSphere.z / 1000;
+  cylinder(fixture, black, referenceSphere.baseRadius / 1000, 0.016, 0, 0.008, 0, 32);
+  cylinder(fixture, black, 0.037, 0.003, 0, 0.0175, 0, 32, 0.043);
+  cylinder(fixture, black, 0.020, 0.105, 0, 0.071, 0, 28);
+  cylinder(fixture, black, 0.0135, 0.015, 0, 0.131, 0, 24, 0.020);
+  addMesh(fixture, new THREE.SphereGeometry(0.020, 24, 16), black, 0, 0.150, 0);
+  transverseFastener(fixture, m.rubber, 0.0045, 0.001, 0, 0.150, 0.020);
+  cylinder(fixture, black, 0.009, 0.013, 0, 0.174, 0, 20, 0.012);
+  const neckTop = center - radius + 0.002;
+  cylinder(fixture, black, 0.0043, neckTop - 0.178, 0, (neckTop + 0.178) / 2, 0, 20, 0.009);
+  addMesh(fixture, new THREE.SphereGeometry(radius, 36, 24), m.referenceCeramic, 0, center, 0);
+  decal(fixture, mark, 0.016, 0.016, 0, 0.073, 0.0205);
+  return fixture;
 }
 
 function buildArtifact(scene, m) {
@@ -557,6 +590,7 @@ export function createScene(container) {
   if (webGL) batchOpaque(adapter);
   const { fixed: rackFrame, stations } = buildRack(scene, m, adapter);
   const artifact = buildArtifact(scene, m);
+  const reference = buildReferenceSphere(scene, m, mark);
   const active = ports.map(port => {
     const tool = group(moving.stylus, 0, stylusLength / 1000, 0);
     buildStylus(tool, m, port, adapter);
@@ -570,6 +604,7 @@ export function createScene(container) {
     batchOpaque(moving.ram, [moving.stylus]);
     batchOpaque(rackFrame);
     batchOpaque(artifact);
+    batchOpaque(reference);
     for (const { cover } of stations) batchOpaque(cover);
   }
 

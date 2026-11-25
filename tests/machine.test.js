@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Machine, axisTravel, orientJog, ports, rack, rackCoverOpening, rackSeat, rackSlide, startingPosition, travel, workpiece, worldPosition } from '../src/machine.js';
+import { Machine, axisTravel, masterStylus, orientJog, ports, rack, rackCoverOpening, rackSeat, rackSlide, startingPosition, travel, workpiece, worldPosition } from '../src/machine.js';
 import { Console } from '../src/console.js';
+import { referenceSphere } from '../src/calibration.js';
 
 const still = { x: 0, y: 0, z: 0 };
 function run(machine, predicate, seconds = 125) {
@@ -58,10 +59,10 @@ test('tool change stores the first tool and docks the requested tool before retr
   const m = new Machine();
   m.speed = 100;
   assert.ok(m.startChange(6));
-  run(m, () => m.message === 'Sliding into port 1' && m.position.y > rack.approach + 40);
+  run(m, () => m.message === 'Sliding into holder 1' && m.position.y > rack.approach + 40);
   assert.equal(m.position.z, rackSlide);
   assert.equal(m.loaded, 1);
-  run(m, () => m.message === 'Releasing adapter at port 1');
+  run(m, () => m.message === 'Releasing adapter at holder 1');
   assert.equal(m.loaded, 1);
   assert.equal(m.position.y, rack.y);
   assert.equal(m.position.z, rackSlide);
@@ -70,10 +71,10 @@ test('tool change stores the first tool and docks the requested tool before retr
   assert.equal(m.dock, 1);
   assert.equal(m.position.y, rack.y);
   assert.equal(m.position.z, rackSlide);
-  run(m, () => m.message === 'Sliding into port 6' && m.position.y > rack.approach + 40);
+  run(m, () => m.message === 'Sliding into holder 6' && m.position.y > rack.approach + 40);
   assert.equal(m.position.z, rackSlide);
   assert.equal(m.loaded, null);
-  run(m, () => m.message === 'Coupling adapter at port 6');
+  run(m, () => m.message === 'Coupling adapter at holder 6');
   assert.equal(m.loaded, null);
   assert.equal(m.position.z, rackSlide);
   run(m, () => m.loaded === 6);
@@ -89,7 +90,7 @@ test('tool change stores the first tool and docks the requested tool before retr
 
 test('emergency stop freezes interrupted changes and each transfer phase can recover', () => {
   for (const stage of [
-    m => m.message === 'Sliding into port 1' && m.position.y > rack.approach + 20,
+    m => m.message === 'Sliding into holder 1' && m.position.y > rack.approach + 20,
     m => m.dock === 1 && m.loaded === null,
     m => m.dock === 4 && m.loaded === 4,
   ]) {
@@ -116,7 +117,7 @@ test('rack clearance recovery cannot push an interrupted pickup back into its po
   const m = new Machine();
   m.speed = 100;
   m.startChange(2);
-  run(m, () => m.dock === 2 && m.loaded === null && m.position.y === rack.y && m.message === 'Coupling adapter at port 2');
+  run(m, () => m.dock === 2 && m.loaded === null && m.position.y === rack.y && m.message === 'Coupling adapter at holder 2');
   m.abort();
   assert.equal(m.position.z, rackSlide);
   assert.ok(m.startChange(3));
@@ -137,6 +138,64 @@ test('practice contact is limited to its top, and points keep their original coo
   m.update(0.05, { z: 1 });
   assert.equal(m.points[0].z, workpiece.top);
   assert.ok(m.position.z > workpiece.top);
+});
+
+test('the master gauge length changes only the tip readout and every ruby clears its shaft', () => {
+  assert.ok(ports.every(stylus => stylus.shaftDiameter < stylus.diameter));
+  assert.equal(masterStylus.diameter, 8);
+  assert.equal(masterStylus.shaftDiameter, 6);
+  assert.equal(masterStylus.componentLength, 63.5);
+  const m = new Machine();
+  m.loaded = masterStylus.id;
+  m.artifact = false;
+  m.speed = 100;
+  for (let i = 0; i < 100; i++) m.update(0.05, { z: -1 });
+  assert.equal(m.tipPosition.z, 0);
+  assert.equal(m.position.z, 10);
+});
+
+test('master calibration swaps the tool, contacts the sphere and scans the equator at two rates', () => {
+  const m = new Machine();
+  m.speed = 100;
+  assert.ok(m.startMasterCalibration());
+  const scanFrames = [0, 0];
+  const radius = referenceSphere.diameter / 2 + masterStylus.diameter / 2;
+  for (let i = 0; i < 2500 && m.plan; i++) {
+    const step = m.plan.steps[m.plan.index];
+    m.update(0.05, still);
+    if (!step.circle) continue;
+    const tip = m.tipPosition;
+    const distance = Math.hypot(tip.x - referenceSphere.x, tip.y - referenceSphere.y);
+    assert.ok(Math.abs(distance - radius) < 1e-8);
+    assert.ok(Math.abs(tip.z + masterStylus.diameter / 2 - referenceSphere.z) < 1e-8);
+    scanFrames[step.rate === 8 ? 0 : 1]++;
+  }
+  assert.equal(m.loaded, masterStylus.id);
+  assert.ok(scanFrames[0] > 4 * scanFrames[1] && scanFrames[1] > 0);
+  assert.equal(m.calibration.state, 'complete');
+  assert.equal(m.calibration.contacts, 5);
+  assert.equal(m.calibration.scans, 2);
+  for (const axis of ['x', 'y', 'z', 'diameter']) {
+    assert.ok(Math.abs(m.calibration.sphere[axis] - referenceSphere[axis]) < 1e-8);
+  }
+});
+
+test('calibration cancelled on the equator preserves the mounted master and can restart', () => {
+  const m = new Machine();
+  m.loaded = masterStylus.id;
+  m.speed = 100;
+  assert.ok(m.startMasterCalibration());
+  run(m, () => m.message.includes('Slow equator scan'));
+  m.update(0.05, still);
+  assert.ok(m.touching);
+  m.emergencyStop();
+  assert.equal(m.calibration.state, 'cancelled');
+  assert.equal(m.touching, false);
+  m.releaseStop();
+  m.enableDrives();
+  assert.ok(m.startMasterCalibration());
+  run(m, () => !m.plan);
+  assert.equal(m.calibration.state, 'complete');
 });
 
 test('console separates host keys, MAN probe clamps and travel direction locks', () => {

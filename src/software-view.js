@@ -1,4 +1,4 @@
-import { Matrix4, Raycaster, Vector3 } from 'three';
+import { Color, Matrix4, Raycaster, Vector3 } from 'three';
 
 const sun = new Vector3(-0.48, 0.79, 0.4).normalize();
 const fill = new Vector3(0.75, 0.45, -0.47).normalize();
@@ -190,7 +190,11 @@ export function createSoftwareView() {
           const p = project(center);
           const e = project(center.add(vertex(0, geometry.parameters.radius, 0)));
           const radius = Math.max(0.8, Math.hypot(p.x - e.x, p.y - e.y));
-          entry.faces.push({ center: p, radius, depth: p.depth });
+          const paint = ctx.createRadialGradient(p.x - radius * 0.28, p.y - radius * 0.32,
+            radius * 0.12, p.x, p.y, radius);
+          paint.addColorStop(0, material.color.clone().lerp(new Color(0xffffff), 0.26).getStyle());
+          paint.addColorStop(1, material.color.clone().multiplyScalar(0.42).getStyle());
+          entry.faces.push({ center: p, radius, depth: p.depth, paint });
         } else {
           const bounds = { left: Infinity, right: -Infinity, top: Infinity, bottom: -Infinity };
           for (const points of facesFor(mesh)) {
@@ -228,7 +232,7 @@ export function createSoftwareView() {
         const { x, y } = surface.center;
         ctx.beginPath();
         ctx.arc(x, y, surface.radius, 0, 2 * Math.PI);
-        ctx.fillStyle = '#ab1440';
+        ctx.fillStyle = surface.paint;
         ctx.fill();
       } else drawFace(ctx, surface, patterns);
     }

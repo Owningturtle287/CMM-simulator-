@@ -28,7 +28,10 @@ export class Console {
     const m = this.machine;
     return menu('Main menu', [
       menu('Display data', [
-        display('Position D17', () => axes.map(a => `${a.toUpperCase()}  ${formatAxis(m.position[a])} mm`)),
+        display('Position D17', () => {
+          const tip = m.tipPosition;
+          return axes.map(a => `${a.toUpperCase()}  ${formatAxis(tip[a])} mm`);
+        }),
         display('Velocity D18', () => axes.map(a => `${a.toUpperCase()}  ${m.velocity[a].toFixed(2)} mm/s`)),
         display('Status D16X', () => [m.drives ? 'DRIVES ON' : 'DRIVES OFF', m.plan ? 'CNC TRAVEL' : m.mode, m.fault || sides[m.side]]),
         display('Probe data', () => [m.loaded ? `System ${m.loaded} / stylus 1` : 'No stylus mounted', 'VAST XT gold', m.scan ? 'Scanning enabled' : 'Scanning disabled']),

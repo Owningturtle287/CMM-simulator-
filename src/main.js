@@ -1,5 +1,5 @@
 import './style.css';
-import { Machine, axes, ports, travel } from './machine.js';
+import { Machine, axes, masterStylus, ports, stylusLabel, travel } from './machine.js';
 import { createScene } from './scene.js';
 import { Console } from './console.js';
 import { layout } from './layout.js';
@@ -10,6 +10,8 @@ const $$ = selector => [...document.querySelectorAll(selector)];
 const machine = new Machine();
 const controller = new Console(machine);
 const select = $('#tool-select');
+const quickActions = $('#quick-actions');
+const stylusDialog = $('#stylus-dialog');
 const dialog = $('#help-dialog');
 const elements = {
   coordinates: Object.fromEntries(axes.map(axis => [axis, $(`#coord-${axis}`)])),
@@ -27,6 +29,9 @@ const elements = {
   lcd: $('#lcd'),
   points: $('#points'),
   clear: $('#clear-points'),
+  calibration: $('#calibration-result'),
+  calibrationProgress: $('#calibration-progress'),
+  calibrationCenter: $('#calibration-center'),
 };
 
 let scene;
@@ -124,15 +129,31 @@ elements.speedControls.forEach(input => input.addEventListener('input', () => {
   machine.speed = Number(input.value);
   updateUI();
 }));
+quickActions.addEventListener('change', () => {
+  const action = quickActions.value;
+  quickActions.value = '';
+  if (action === 'stylus') {
+    releaseInputs();
+    stylusDialog.showModal();
+  } else if (action === 'calibrate') {
+    releaseInputs();
+    machine.startMasterCalibration();
+  } else if (action === 'cancel') {
+    command('esc');
+  }
+  updateUI();
+});
 select.addEventListener('change', () => {
   const id = Number(select.value);
+  select.value = '';
   if (id) {
+    stylusDialog.close();
     releaseInputs();
     machine.startChange(id);
   }
-  select.value = '';
   updateUI();
 });
+$('[data-close-stylus]').addEventListener('click', () => stylusDialog.close());
 $('#artifact').addEventListener('change', event => {
   machine.artifact = event.target.checked;
   machine.report(machine.artifact ? 'Reference block placed on the granite.' : 'Reference block removed.');
@@ -221,7 +242,7 @@ $$('[data-jog]').forEach(button => {
 });
 
 document.addEventListener('keydown', event => {
-  if (event.metaKey || event.altKey || event.ctrlKey || dialog.open) return;
+  if (event.metaKey || event.altKey || event.ctrlKey || dialog.open || stylusDialog.open) return;
   if (event.key === 'Escape' && machine.plan) {
     event.preventDefault();
     command('esc');
@@ -315,8 +336,9 @@ function updateConsoleDisplay(m, coordinates) {
 function updateUI() {
   const m = machine;
   const coordinates = {};
+  const tip = m.tipPosition;
   for (const axis of axes) {
-    const value = m.position[axis].toFixed(3);
+    const value = tip[axis].toFixed(3);
     setText(elements.coordinates[axis], value);
     setText(elements.mobile[axis], value);
     coordinates[axis] = value;
@@ -331,16 +353,19 @@ function updateUI() {
     setText(elements.drives, m.stopped ? 'E-stop latched' : m.drives ? 'Enabled' : 'Disabled');
     elements.drives.dataset.active = m.stopped ? 'stop' : String(m.drives);
     elements.diode.dataset.state = m.stopped || m.fault ? 'error' : m.plan ? 'busy' : m.drives ? 'ready' : 'off';
-    setText(elements.stylus, port ? `Port ${String(port.id).padStart(2, '0')} · Ø${port.diameter} mm` : 'Unloaded');
+    setText(elements.stylus, port ? stylusLabel(port) : 'Unloaded');
     setText(elements.speed, `${m.speed}%`);
     elements.speedControls.forEach(input => { if (Number(input.value) !== m.speed) input.value = m.speed; });
     elements.dial.style.setProperty('--angle', `${-135 + 2.7 * m.speed}deg`);
-    select.disabled = !m.drives || m.stopped || Boolean(m.plan) || m.mode !== 'AUTO';
+    const available = m.drives && !m.stopped && !m.plan && !m.fault && m.mode === 'AUTO';
+    select.disabled = quickActions.options[1].disabled = !available;
+    quickActions.options[2].disabled = !available || m.manualTool === masterStylus.id;
+    quickActions.options[3].disabled = quickActions.options[3].hidden = !m.plan;
     for (const option of portOptions) {
       const id = Number(option.value);
       option.disabled = id === m.manualTool || (id === m.loaded && !m.dock);
       const status = id === m.loaded ? ' · mounted' : id === m.manualTool ? ' · held' : '';
-      setText(option, `Port ${String(id).padStart(2, '0')} · Ø${ports[id - 1].diameter} mm${status}`);
+      setText(option, `${stylusLabel(ports[id - 1])}${status}`);
     }
   }
   const lamps = {
@@ -356,6 +381,16 @@ function updateUI() {
     if (button.getAttribute('aria-pressed') !== value) button.setAttribute('aria-pressed', value);
   }
   updateConsoleDisplay(m, coordinates);
+  if (m.calibration) {
+    const { state, contacts, scans, sphere } = m.calibration;
+    elements.calibration.hidden = false;
+    const counts = `${contacts}/5 contacts · ${scans}/2 scans`;
+    setText(elements.calibrationProgress, state === 'cancelled' ? `Cancelled · ${counts}` : counts);
+    elements.calibrationCenter.hidden = !sphere;
+    if (sphere) {
+      setText(elements.calibrationCenter, `Ø${sphere.diameter.toFixed(3)} mm · X ${sphere.x.toFixed(2)} · Y ${sphere.y.toFixed(2)} · Z ${sphere.z.toFixed(2)}`);
+    }
+  }
   if (m.points.length !== previousPoints) {
     elements.clear.hidden = m.points.length === 0;
     elements.points.innerHTML = m.points.length ? `<ol>${m.points.map((point, index) => `<li>

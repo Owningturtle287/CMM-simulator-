@@ -52,7 +52,6 @@ h2 { margin: 0; }
 }
 .tool-control > svg:first-child { font-size: 19px; flex: none; }
 .tool-control > svg:last-child { font-size: 12px; pointer-events: none; }
-.tool-control span { font-size: 12px; font-weight: 700; white-space: nowrap; }
 .tool-control select {
   position: relative;
   appearance: none;
@@ -61,10 +60,11 @@ h2 { margin: 0; }
   border: 0;
   padding: 0 18px 0 9px;
   margin-right: -17px;
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 650;
+  max-width: 158px;
   height: 100%;
   outline-offset: 0;
-  border-left: 1px solid #d5e4fa;
 }
 .tool-control option { color: #172438; background: white; }
 .icon-button {
@@ -212,6 +212,17 @@ h2 { margin: 0; }
 #drive-status[data-active="true"] { color: #167349; }
 #drive-status[data-active="stop"] { color: #a22b2b; }
 #speed { display: block; width: 100%; height: 19px; margin: 1px 0 0; accent-color: #105fbf; cursor: pointer; }
+.calibration-result {
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  color: #425c76;
+  font-size: 10px;
+}
+.calibration-result b { color: #243c57; font-size: 11px; }
+.calibration-result code { font: 10px/1.5 var(--mono); overflow-wrap: anywhere; }
 .point-log { min-height: 0; display: flex; flex-direction: column; }
 .point-log .card-heading { margin-bottom: 8px; }
 #points { overflow: auto; scrollbar-width: thin; font-size: 11px; color: var(--muted); max-height: 140px; }
@@ -441,6 +452,17 @@ dialog::backdrop { background: #26374688; }
 .dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 9px; }
 .dialog-head h2 { font-size: 18px; }
 dialog dl { margin: 13px 0 6px; }
+#stylus-dialog { width: min(410px, calc(100vw - 30px)); }
+#tool-select {
+  width: 100%;
+  margin-top: 15px;
+  padding: 10px 12px;
+  border: 1px solid #c8daee;
+  border-radius: 7px;
+  color: #123b6b;
+  background: #eef5ff;
+  font-size: 16px;
+}
 dialog dt { font-size: 13px; font-weight: 750; }
 dialog dd { margin: 4px 0 11px; color: #4f6275; font-size: 12px; line-height: 1.5; }
 
@@ -460,8 +482,7 @@ dialog dd { margin: 4px 0 11px; color: #4f6275; font-size: 12px; line-height: 1.
   .brand span { font-size: 8px; margin-top: 3px; }
   .top-actions, .tool-control { gap: 5px; }
   .tool-control { height: 38px; padding-inline: 6px; }
-  .tool-control > span { display: none; }
-  .tool-control select { border: 0; font-size: 16px; padding-left: 1px; max-width: 148px; }
+  .tool-control select { font-size: 16px; padding-left: 1px; max-width: 128px; }
   .top-actions .help { width: 33px; height: 38px; }
   .stage { order: 0; }
   .stage-head { padding: 9px; }

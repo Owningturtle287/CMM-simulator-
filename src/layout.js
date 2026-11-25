@@ -1,5 +1,5 @@
 import { icon } from './icons.js';
-import { ports, travel } from './machine.js';
+import { ports, stylusLabel, travel } from './machine.js';
 
 const logo = `${import.meta.env.BASE_URL}zeiss.svg`;
 export const axes = ['x', 'y', 'z'];
@@ -86,10 +86,12 @@ export function layout() {
     <div class="head-inner">
       <div class="brand"><img src="${logo}" alt="ZEISS"><div><b>ACCURA</b><span>CMM SIMULATOR</span></div></div>
       <div class="top-actions">
-        <label class="tool-control" for="tool-select">${icon('rack')}<span>Stylus rack</span>
-          <select id="tool-select" aria-label="Change stylus from the rear rack">
-            <option value="">Choose port</option>
-            ${ports.map(p => `<option value="${p.id}">Port ${String(p.id).padStart(2,'0')} · Ø${p.diameter} mm</option>`).join('')}
+        <label class="tool-control" for="quick-actions">${icon('rack')}
+          <select id="quick-actions" aria-label="Quick Actions">
+            <option value="">Quick Actions</option>
+            <option value="stylus">Change stylus system</option>
+            <option value="calibrate">Calibrate master probe</option>
+            <option value="cancel" hidden disabled>Cancel automatic travel</option>
           </select>
           ${icon('chevron')}
         </label>
@@ -141,6 +143,11 @@ export function layout() {
           <div class="state-line"><span>Active stylus</span><b id="active-stylus"></b></div>
           <div class="state-line"><label for="speed">Speed override</label><b id="speed-value">35%</b></div>
           <input id="speed" type="range" data-speed min="0" max="100" value="35" aria-label="Speed override">
+          <div id="calibration-result" class="calibration-result" aria-live="polite" hidden>
+            <b>Master probe calibration</b>
+            <span id="calibration-progress"></span>
+            <code id="calibration-center" hidden></code>
+          </div>
         </section>
         <section class="card point-log">
           <div class="card-heading"><h2>Point log</h2><button class="text-button" id="clear-points" hidden>Clear</button></div>
@@ -164,13 +171,24 @@ export function layout() {
     </section>
     <footer><span>Independent simulator</span><label><input id="artifact" type="checkbox" checked> Show reference block</label></footer>
   </main>
+  <dialog id="stylus-dialog" aria-labelledby="stylus-dialog-title">
+    <div class="dialog-head">
+      <h2 id="stylus-dialog-title">Choose stylus system</h2>
+      <button type="button" class="icon-button" data-close-stylus aria-label="Close stylus picker">${icon('cross')}</button>
+    </div>
+    <select id="tool-select" aria-label="Choose stylus system">
+      <option value="">Choose stylus system</option>
+      ${ports.map(p => `<option value="${p.id}">${stylusLabel(p)}</option>`).join('')}
+    </select>
+  </dialog>
   <dialog id="help-dialog">
     <div class="dialog-head"><h2>Operating the simulator</h2><button type="button" class="icon-button" data-close aria-label="Close control guide">${icon('cross')}</button></div>
     <dl>
       <dt>Jog the machine</dt><dd>Hold and drag the right stick for X/Y and the left stick for Z. On desktop, use W/A/S/D and Q/E. Unlock either joystick after the console idles for a minute.</dd>
       <dt>Inspect the machine</dt><dd>Scroll over a spot or pinch around it to zoom. Double-click or double-tap a part to center it. Drag to orbit, or drag with the right mouse button or two fingers to pan.</dd>
       <dt>Machine coordinates</dt><dd>From the front, +X is right, +Y is away and +Z is up. Zero is at the front-left of the measuring area at granite height. The rear rack uses service travel beyond Y 1,200 mm.</dd>
-      <dt>Change a stylus</dt><dd>With drives on and AUTO selected, choose a rear rack port. Each adapter slides into its socket from the front. The magnetic receiver releases the old plate and slides the selected plate out. Each system has a single downward tip.</dd>
+      <dt>Change a stylus</dt><dd>With drives on and AUTO selected, open Quick Actions and choose Change stylus system. Each adapter slides into its socket from the front. The magnetic receiver releases the old plate and slides the selected plate out. Each system has a single downward tip.</dd>
+      <dt>Calibrate the master probe</dt><dd>Select Calibrate master probe in Quick Actions. The machine mounts the master, locates the ceramic sphere, then performs slow and fast Dynamic Tensor demonstration scans. Use the Probe view to follow the tip.</dd>
       <dt>Power and reference</dt><dd>Press the red mushroom to stop. Press it again to simulate twisting it loose, then press M to enable drives. For reference travel, press Shift, Return, then F12.</dd>
       <dt>Record a point</dt><dd>Press M-Point to record the current 3D point. Click the center of the right stick to record an intermediate travel point.</dd>
       <dt>Console functions</dt><dd>Menu opens the built-in settings. Shift, Return, then F5 or F6 switches AUTO or MAN. The physical keypad uses the same shortcuts. The optional rotary table, articulated probe, and host function keys require their corresponding hardware or software.</dd>
