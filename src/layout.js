@@ -13,18 +13,23 @@ function lamp(id, x, y, style = '') {
   return `<i class="lamp ${style}" data-lamp="${id}" style="--x:${x}%;--y:${y}%"></i>`;
 }
 
+function joystick(axis) {
+  const vertical = axis === 'z';
+  const label = vertical ? 'Left joystick, Z up and down' :
+    'Right joystick, X and Y. Tap center to record an intermediate point.';
+  return `<button class="stick ${vertical ? 'left' : 'right'}-stick" type="button" data-stick="${axis}" title="${label}" aria-label="${label}">
+    <span class="stick-gaiter"></span><span class="stick-knob"></span>
+  </button>`;
+}
+
 function console() {
   const button = consoleButton;
   return `<div class="console-scroll" tabindex="0" aria-label="BP26SE controller. Scroll horizontally on narrow screens.">
     <div class="console-body">
       <div class="console-face"></div>
       <img class="console-logo" src="${logo}" alt="ZEISS">
-      <button class="stick left-stick" type="button" data-stick="z" title="Left joystick · Z up and down" aria-label="Left joystick, Z up and down">
-        <span class="stick-gaiter"></span><span class="stick-knob"></span>
-      </button>
-      <button class="stick right-stick" type="button" data-stick="xy" title="Right joystick · X and Y. Click center to record an intermediate point." aria-label="Right joystick, X and Y. Click center to record an intermediate point.">
-        <span class="stick-gaiter"></span><span class="stick-knob"></span>
-      </button>
+      ${joystick('z')}
+      ${joystick('xy')}
       <span class="stick-text stick-text-z">Z</span><span class="stick-text stick-text-x">X</span><span class="stick-text stick-text-y">Y</span>
       ${button('unlock-left', 11.1, 56.5, icon('unlock'), 'Left joystick unlock', 'unlock')}
       ${button('unlock-right', 89.1, 56.5, icon('unlock'), 'Right joystick unlock', 'unlock')}
@@ -88,6 +93,7 @@ export function layout() {
       <div class="brand"><img src="${logo}" alt="ZEISS"><div><b>ACCURA</b><span>CMM SIMULATOR</span></div></div>
       <div class="top-actions">
         <label class="tool-control" for="quick-actions">${icon('rack')}
+          <span class="quick-caption" aria-hidden="true">Quick Actions</span>
           <select id="quick-actions" aria-label="Quick Actions">
             <option value="">Quick Actions</option>
             <option value="stylus">Change stylus system</option>
@@ -172,7 +178,7 @@ export function layout() {
       </div>
       ${console()}
     </section>
-    ${mobileConsole()}
+    ${mobileConsole(joystick, logo)}
     <footer><span>Independent simulator</span><label class="artifact-option"><input id="artifact" type="checkbox" checked> Show reference block</label></footer>
   </main>
   <dialog id="machine-info" aria-labelledby="machine-info-title">
@@ -196,7 +202,7 @@ export function layout() {
     <div class="dialog-head"><h2>Operating the simulator</h2><button type="button" class="icon-button" data-close aria-label="Close control guide">${icon('cross')}</button></div>
     <dl>
       <dt>Jog the machine</dt><dd>Hold and drag the right stick for X/Y and the left stick for Z. On desktop, use W/A/S/D and Q/E. Unlock either joystick after the console idles for a minute.</dd>
-      <dt>Mobile Mode</dt><dd>Turn on Mobile Mode and rotate to landscape. Hold XY and Z buttons to jog. Use Functions for F1–F12 and probe axes, and Keypad to navigate or enter text. E-stop stays within reach in every panel.</dd>
+      <dt>Mobile Mode</dt><dd>Turn on Mobile Mode and rotate to landscape. Drag the left stick for Z or the right stick for X/Y. Use Functions and Keypad for the other console keys. Quick Actions, Mobile Mode and E-stop are on the controller.</dd>
       <dt>Inspect the machine</dt><dd>Scroll over a spot or pinch around it to zoom. Double-click or double-tap a part to center it. Drag to orbit, or drag with the right mouse button or two fingers to pan.</dd>
       <dt>Machine coordinates</dt><dd>From the front, +X is right, +Y is away and +Z is up. Zero is at the front-left of the measuring area at granite height. The rear rack uses service travel beyond Y 1,200 mm.</dd>
       <dt>Change a stylus</dt><dd>With drives on and AUTO selected, open Quick Actions and choose Change stylus system. Each adapter slides into its socket from the front. The magnetic receiver releases the old plate and slides the selected plate out. Each system has a single downward tip.</dd>

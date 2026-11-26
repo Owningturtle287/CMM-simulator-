@@ -3,6 +3,9 @@ export function setupMobileMode(releaseInputs) {
   const landscape = window.matchMedia('(orientation: landscape) and (min-width: 500px)');
   const coarsePointer = window.matchMedia('(pointer: coarse)');
   const toggle = document.querySelector('#mobile-mode');
+  const header = document.querySelector('.head-inner');
+  const actions = header.querySelector('.top-actions');
+  const touchUtilities = document.querySelector('.touch-utilities');
   const info = document.querySelector('#machine-info');
   const infoBody = document.querySelector('#machine-info-content');
   const sidebar = document.querySelector('.sidebar');
@@ -22,17 +25,21 @@ export function setupMobileMode(releaseInputs) {
     toggle.title = on && !landscape.matches ? 'Mobile Mode on. Rotate for landscape controls.' : 'Mobile Mode';
     const next = on && landscape.matches;
     if (next === active) return;
+    const restoreToggleFocus = document.activeElement === toggle;
     releaseInputs();
     active = next;
     root.toggleAttribute('data-mobile-layout', active);
     if (active) {
+      touchUtilities.append(actions);
       infoBody.append(sidebar, artifact);
       window.scrollTo(0, 0);
     } else {
       if (info.open) info.close();
+      header.append(actions);
       workbench.append(sidebar);
       footer.append(artifact);
     }
+    if (restoreToggleFocus) toggle.focus({ preventScroll: true });
   }
 
   function selectTab(tab) {

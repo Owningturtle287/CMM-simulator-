@@ -1,6 +1,6 @@
 import './style.css';
 import './mobile-mode.css';
-import { Machine, axes, masterStylus, orientJog, ports, stylusLabel, travel } from './machine.js';
+import { Machine, axes, masterStylus, ports, stylusLabel, travel } from './machine.js';
 import { createScene } from './scene.js';
 import { Console } from './console.js';
 import { layout } from './layout.js';
@@ -34,7 +34,6 @@ const elements = {
   touchLock: $('#touch-lock-label'),
   touchStop: $('#touch-stop-label'),
   touchSide: $('#touch-side-label'),
-  touchJog: $$('.touch-console [data-jog]'),
   points: $('#points'),
   clear: $('#clear-points'),
   calibration: $('#calibration-result'),
@@ -323,7 +322,6 @@ let previousPoints = -1;
 let previousTouch = false;
 let previousFault = '';
 let previousLock = false;
-let previousSide;
 let activeLcd;
 function updateConsoleDisplay(m, coordinates) {
   const lcd = document.documentElement.hasAttribute('data-mobile-layout') ? elements.touchLcd : elements.lcd;
@@ -364,20 +362,7 @@ function updateUI() {
   setText(elements.message, m.message);
   setText(elements.touchLock, m.locked ? 'Unlock' : 'Lock jog');
   setText(elements.touchStop, m.stopped ? 'Release' : 'E-stop');
-  if (m.side !== previousSide) {
-    previousSide = m.side;
-    setText(elements.touchSide, ['Front', 'Left', 'Rear', 'Right'][m.side]);
-    for (const button of elements.touchJog) {
-      const [axis, amount] = button.dataset.jog.split(',');
-      const motion = orientJog({ [axis]: Number(amount) }, m.side);
-      const machineAxis = axes.find(axis => motion[axis]);
-      const positive = motion[machineAxis] > 0;
-      const label = `Jog ${positive ? 'positive' : 'negative'} ${machineAxis.toUpperCase()}`;
-      setText(button, `${machineAxis.toUpperCase()}${positive ? '+' : '−'}`);
-      button.setAttribute('aria-label', label);
-      button.title = label;
-    }
-  }
+  setText(elements.touchSide, ['Front', 'Left', 'Rear', 'Right'][m.side]);
   setText(elements.frameLabel, m.position.y > travel.y ? 'REAR SERVICE TRAVEL' : 'MACHINE FRAME');
   const settings = [m.mode, Boolean(m.plan), m.drives, m.stopped, Boolean(m.fault), m.loaded, m.manualTool, Boolean(m.dock), m.speed];
   if (!lastSettings || settings.some((value, index) => value !== lastSettings[index])) {
