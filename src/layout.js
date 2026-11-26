@@ -1,5 +1,6 @@
 import { icon } from './icons.js';
 import { mobileConsole } from './mobile-console.js';
+import { workstationLayout } from './workstation.js';
 import { ports, stylusLabel, travel } from './machine.js';
 
 const logo = `${import.meta.env.BASE_URL}zeiss.svg`;
@@ -129,7 +130,10 @@ export function layout() {
               <circle cx="33" cy="49" r="3" fill="#526477"/>
             </svg>
             <div class="stage-hint"><span class="mouse-hint">Scroll to zoom · Double-click to focus</span><span class="touch-hint">Pinch to zoom · Double-tap to focus</span></div>
-            <button class="icon-button reset" data-reset aria-label="Reset camera" title="Reset camera">${icon('reset')}</button>
+            <div class="stage-actions">
+              <button class="icon-button stage-pc" type="button" data-workstation aria-label="Open inspection workstation" title="Open inspection workstation">PC</button>
+              <button class="icon-button reset" data-reset aria-label="Reset camera" title="Reset camera">${icon('reset')}</button>
+            </div>
           </div>
         </div>
         <div class="mobile-readout" role="group" aria-label="Machine coordinates in millimeters">
@@ -181,6 +185,7 @@ export function layout() {
     ${mobileConsole(joystick, logo)}
     <footer><span>Independent simulator</span><label class="artifact-option"><input id="artifact" type="checkbox" checked> Show reference block</label></footer>
   </main>
+  ${workstationLayout()}
   <dialog id="machine-info" aria-labelledby="machine-info-title">
     <div class="dialog-head">
       <h2 id="machine-info-title">Machine information</h2>
@@ -204,6 +209,7 @@ export function layout() {
       <dt>Jog the machine</dt><dd>Hold and drag the right stick for X/Y and the left stick for Z. On desktop, use W/A/S/D and Q/E. Unlock either joystick after the console idles for a minute.</dd>
       <dt>Mobile Mode</dt><dd>Turn on Mobile Mode and rotate to landscape. Drag the left stick for Z or the right stick for X/Y. Use Functions and Keypad for the other console keys. Quick Actions, Mobile Mode and E-stop are on the controller.</dd>
       <dt>Inspect the machine</dt><dd>Scroll over a spot or pinch around it to zoom. Double-click or double-tap a part to center it. Drag to orbit, or drag with the right mouse button or two fingers to pan.</dd>
+      <dt>Inspection workstation</dt><dd>Tap the monitor beside the machine or select PC in the 3D view. Load the practice plan to measure the reference block.</dd>
       <dt>Machine coordinates</dt><dd>From the front, +X is right, +Y is away and +Z is up. Zero is at the front-left of the measuring area at granite height. The rear rack uses service travel beyond Y 1,200 mm.</dd>
       <dt>Change a stylus</dt><dd>With drives on and AUTO selected, open Quick Actions and choose Change stylus system. Each adapter slides into its socket from the front. The magnetic receiver releases the old plate and slides the selected plate out. Each system has a single downward tip.</dd>
       <dt>Calibrate the master probe</dt><dd>Select Calibrate master probe in Quick Actions. The machine mounts the master, locates the ceramic sphere, then performs slow and fast Dynamic Tensor demonstration scans. Use the Probe view to follow the tip.</dd>

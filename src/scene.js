@@ -605,13 +605,89 @@ function batchOpaque(root, moving = []) {
   }
 }
 
+function buildWorkstation(scene, m) {
+  const desk = group(scene, -1.565, -0.704, 0.28);
+  const laminate = metal(0x71818b, 0.12, 0.48);
+  const framePaint = metal(0x3c4955, 0.36, 0.34);
+  box(desk, laminate, 1.16, 0.046, 0.674, 0, 0.742, 0, 0.012);
+  box(desk, framePaint, 1.10, 0.060, 0.040, 0, 0.690, -0.274, 0.006);
+  for (const x of [-0.52, 0.52]) {
+    box(desk, framePaint, 0.058, 0.692, 0.059, x, 0.364, -0.248, 0.006);
+    box(desk, framePaint, 0.070, 0.047, 0.606, x, 0.026, 0.012, 0.009);
+    for (const z of [-0.22, 0.24]) box(desk, m.rubber, 0.072, 0.012, 0.088, x, 0.008, z, 0.005);
+  }
+  box(desk, framePaint, 0.244, 0.025, 0.062, -0.425, 0.103, -0.238, 0.004);
+  box(desk, framePaint, 0.26, 0.034, 0.394, -0.326, 0.110, -0.057, 0.006);
+  box(desk, m.black, 0.181, 0.415, 0.337, -0.326, 0.335, -0.062, 0.009);
+  box(desk, m.rubber, 0.158, 0.386, 0.011, -0.326, 0.335, 0.109, 0.004);
+  for (let i = 0; i < 9; i++) box(desk, framePaint, 0.117, 0.003, 0.004, -0.326, 0.258 + i * 0.011, 0.116);
+  box(desk, m.steel, 0.027, 0.006, 0.003, -0.297, 0.462, 0.117, 0.001);
+  const lamp = metal(0x55ad8c, 0.1, 0.38, { emissive: 0x168975, emissiveIntensity: .7 });
+  box(desk, lamp, 0.007, 0.004, 0.004, -0.374, 0.461, 0.118, 0.001);
+
+  box(desk, m.black, 0.255, 0.016, 0.199, -0.04, 0.776, -0.153, 0.007);
+  box(desk, framePaint, 0.046, 0.221, 0.049, -0.04, 0.885, -0.161, 0.006);
+  const monitor = group(desk, -0.04, 1.096, -0.133);
+  monitor.rotation.y = 0.17;
+  box(monitor, m.black, 0.608, 0.356, 0.036, 0, 0, 0, 0.006);
+  box(monitor, framePaint, 0.602, 0.022, 0.011, 0, -0.163, 0.016, 0.003);
+  box(monitor, lamp, 0.008, 0.003, 0.004, 0.261, -0.165, 0.024, 0.001);
+
+  box(desk, m.black, 0.408, 0.016, 0.141, -0.071, 0.775, 0.135, 0.006);
+  for (let row = 0; row < 5; row++) {
+    for (let col = 0; col < 15; col++) {
+      if (row === 4 && col >= 4 && col <= 9) continue;
+      box(desk, framePaint, 0.021, 0.006, 0.018, -0.256 + col * 0.026, 0.786, 0.086 + row * 0.024);
+    }
+  }
+  box(desk, framePaint, 0.151, 0.006, 0.018, -0.087, 0.786, 0.182, 0.002);
+  box(desk, m.rubber, 0.141, 0.003, 0.159, 0.287, 0.768, 0.134, 0.010);
+  box(desk, m.black, 0.052, 0.022, 0.083, 0.284, 0.779, 0.130, 0.010);
+  box(desk, framePaint, 0.008, 0.007, 0.019, 0.284, 0.791, 0.108, 0.002);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 1024;
+  canvas.height = 576;
+  const ctx = canvas.getContext('2d');
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const screen = decal(monitor, texture, 0.580, 0.326, 0, 0.007, 0.020);
+  screen.material.toneMapped = false;
+  function paint(plan, status, section) {
+    ctx.fillStyle = '#14243a'; ctx.fillRect(0, 0, 1024, 576);
+    ctx.fillStyle = '#243b55'; ctx.fillRect(0, 0, 1024, 107);
+    ctx.fillStyle = '#63dbca'; ctx.fillRect(0, 103, 1024, 4);
+    ctx.fillStyle = '#f3f7ff'; ctx.font = '700 42px system-ui'; ctx.fillText('Inspection workstation', 38, 57);
+    ctx.fillStyle = '#a8c5dd'; ctx.font = '500 22px system-ui'; ctx.fillText('CALYPSO 2025 workflow trainer', 40, 88);
+    ctx.fillStyle = '#1d3148'; ctx.fillRect(0, 108, 245, 468);
+    for (const [index, name] of ['Setup', 'Features', 'Characteristics', 'Results'].entries()) {
+      const y = 140 + index * 73;
+      if (section === name) { ctx.fillStyle = '#2a5967'; ctx.fillRect(18, y, 207, 55); }
+      ctx.fillStyle = '#e2edf8'; ctx.font = '600 23px system-ui'; ctx.fillText(name, 40, y + 36);
+    }
+    ctx.fillStyle = '#edf5ff'; ctx.font = '600 33px system-ui'; ctx.fillText(plan, 283, 166, 690);
+    ctx.fillStyle = '#65d7c6'; ctx.font = '600 22px system-ui'; ctx.fillText(status, 285, 207, 680);
+    ctx.fillStyle = '#263e56'; ctx.fillRect(283, 241, 690, 235);
+    ctx.fillStyle = '#4d758e'; ctx.fillRect(499, 289, 243, 135);
+    ctx.strokeStyle = '#a4c4d9'; ctx.lineWidth = 3; ctx.strokeRect(499, 289, 243, 135);
+    ctx.fillStyle = '#a2eadf';
+    for (const [x, y] of [[621, 355], [540, 323], [702, 323], [540, 390], [702, 390]]) {
+      ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.fillStyle = '#edf5ff'; ctx.font = '600 25px system-ui'; ctx.fillText('Open workstation', 283, 529);
+    texture.needsUpdate = true;
+  }
+  paint('Untitled measurement plan', 'Machine ready · AUTO', 'Setup');
+  return { desk, screen, paint };
+}
+
 const views = {
-  iso: { eye: [3.1, 2.22, 4.22], target: [0, 0.75, 0.018], zoom: 1.00 },
+  iso: { eye: [2.64, 2.17, 4.26], target: [-0.46, 0.70, 0.058], zoom: 1.00 },
   front: { eye: [0, 1.76, 5.3], target: [0, 0.75, 0.0], zoom: 1.00 },
   rack: { eye: [0.28, 1.19, 3.21], target: [0, 0.34, -0.62], zoom: 2.62 },
 };
 
-export function createScene(container) {
+export function createScene(container, onWorkstation) {
   const canvas = document.createElement('canvas');
   const options = { antialias: true, alpha: false, powerPreference: 'high-performance' };
   const context = canvas.getContext('webgl2', options);
@@ -685,6 +761,7 @@ export function createScene(container) {
   mark.anisotropy = 8;
   const base = group(scene);
   buildBase(base, m);
+  const workstation = buildWorkstation(scene, m);
   const moving = buildBridge(scene, m, mark);
   const updateCarrier = buildYCarrier(scene, m, Boolean(webGL));
   const adapter = buildAdapter(m, mark);
@@ -700,6 +777,7 @@ export function createScene(container) {
 
   if (webGL) {
     batchOpaque(base);
+    batchOpaque(workstation.desk);
     batchOpaque(moving.bridge, [moving.carriage]);
     batchOpaque(moving.carriage, [moving.ram]);
     batchOpaque(moving.ram, [moving.stylus]);
@@ -715,13 +793,26 @@ export function createScene(container) {
     object.matrixAutoUpdate = false;
   });
 
-  let selectedView, probeCenter;
+  let selectedView, probeCenter, cameraMotion, returnPose;
   let position = startingPosition;
+  function projection() {
+    const { clientWidth: width, clientHeight: height } = container;
+    if (!width || !height) return;
+    const ratio = width / height;
+    const halfHeight = Math.max(1.62, (selectedView === 'iso' ? 1.87 : 1.25) / ratio);
+    camera.top = halfHeight;
+    camera.bottom = -halfHeight;
+    camera.left = -halfHeight * ratio;
+    camera.right = halfHeight * ratio;
+    camera.updateProjectionMatrix();
+  }
   function probeFocus() {
     const [x, y, z] = worldPosition(position);
     return new THREE.Vector3(x, y + 0.096, z);
   }
   const setView = name => {
+    cameraMotion = null;
+    control.enabled = true;
     selectedView = name;
     if (name === 'probe') {
       probeCenter = probeFocus();
@@ -734,14 +825,14 @@ export function createScene(container) {
       control.target.set(...view.target);
       camera.zoom = view.zoom;
     }
-    camera.updateProjectionMatrix();
+    projection();
     control.update();
     dirty = true;
   };
   const focusRay = new THREE.Raycaster();
-  function focusAt(clientX, clientY) {
+  function pointRay(clientX, clientY) {
     const bounds = renderer.domElement.getBoundingClientRect();
-    if (!bounds.width || !bounds.height) return;
+    if (!bounds.width || !bounds.height) return false;
     const pointer = new THREE.Vector2(
       (clientX - bounds.left) / bounds.width * 2 - 1,
       1 - (clientY - bounds.top) / bounds.height * 2,
@@ -749,11 +840,18 @@ export function createScene(container) {
     camera.updateMatrixWorld();
     scene.updateMatrixWorld();
     focusRay.setFromCamera(pointer, camera);
+    return true;
+  }
+  function opaqueParts() {
     const parts = [];
     scene.traverseVisible(object => {
       if (object.isMesh && object !== floor && !object.material.transparent) parts.push(object);
     });
-    const hit = focusRay.intersectObjects(parts, false)[0];
+    return parts;
+  }
+  function focusAt(clientX, clientY) {
+    if (!pointRay(clientX, clientY)) return;
+    const hit = focusRay.intersectObjects(opaqueParts(), false)[0];
     if (!hit) return;
     camera.position.add(hit.point.clone().sub(control.target));
     control.target.copy(hit.point);
@@ -763,43 +861,98 @@ export function createScene(container) {
     dirty = true;
   }
 
-  let touchStart, firstTap;
+  function pose() {
+    return { eye: camera.position.clone(), center: control.target.clone(), zoom: camera.zoom };
+  }
+  function moveCamera(destination, done) {
+    cameraMotion = { from: pose(), destination, start: performance.now(), done };
+    control.enabled = false;
+  }
+  function openWorkstation(done) {
+    if (returnPose) return false;
+    returnPose = pose();
+    const center = workstation.screen.getWorldPosition(new THREE.Vector3());
+    const facing = new THREE.Vector3(0, 0, 1).applyQuaternion(workstation.screen.getWorldQuaternion(new THREE.Quaternion()));
+    const zoom = Math.min(camera.top * 2 / 0.326, camera.right * 2 / 0.580) * 0.89;
+    moveCamera({ center, eye: center.clone().addScaledVector(facing, 2.3), zoom }, done);
+    return true;
+  }
+  function closeWorkstation() {
+    if (!returnPose) return;
+    if (selectedView === 'probe') {
+      const center = probeFocus();
+      const shift = center.clone().sub(probeCenter);
+      returnPose.eye.add(shift);
+      returnPose.center.add(shift);
+      probeCenter = center;
+    }
+    moveCamera(returnPose);
+    returnPose = null;
+  }
+  function animateCamera(now) {
+    if (!cameraMotion) return;
+    const { from, destination, start, done } = cameraMotion;
+    const elapsed = Math.min(1, Math.max(0, (now - start) / 360));
+    const t = elapsed * elapsed * (3 - 2 * elapsed);
+    camera.position.lerpVectors(from.eye, destination.eye, t);
+    control.target.lerpVectors(from.center, destination.center, t);
+    camera.zoom = from.zoom * (destination.zoom / from.zoom) ** t;
+    camera.updateProjectionMatrix();
+    dirty = true;
+    if (elapsed === 1) {
+      cameraMotion = null;
+      control.enabled = true;
+      done?.();
+    }
+  }
+
+  let press, firstTap;
   let lastTouchFocus = -Infinity;
   const surface = renderer.domElement;
   surface.addEventListener('dblclick', event => {
-    if (event.button === 0 && performance.now() - lastTouchFocus > 450) focusAt(event.clientX, event.clientY);
+    if (!returnPose && event.button === 0 && performance.now() - lastTouchFocus > 450) focusAt(event.clientX, event.clientY);
   });
   surface.addEventListener('pointerdown', event => {
-    if (event.pointerType !== 'touch') return;
-    if (event.isPrimary) touchStart = { x: event.clientX, y: event.clientY, time: event.timeStamp };
-    else touchStart = firstTap = null;
+    if (!event.isPrimary) {
+      press = firstTap = null;
+    } else if (event.button === 0) {
+      press = { id: event.pointerId, x: event.clientX, y: event.clientY, time: event.timeStamp, moved: false };
+    }
+  });
+  surface.addEventListener('pointermove', event => {
+    if (press?.id === event.pointerId && Math.hypot(event.clientX - press.x, event.clientY - press.y) > 9) press.moved = true;
   });
   surface.addEventListener('pointerup', event => {
-    if (event.pointerType !== 'touch' || !event.isPrimary || !touchStart) return;
+    if (press?.id !== event.pointerId) return;
     const tap = { x: event.clientX, y: event.clientY, time: event.timeStamp };
-    const moved = Math.hypot(tap.x - touchStart.x, tap.y - touchStart.y) > 10;
-    const held = tap.time - touchStart.time > 350;
-    touchStart = null;
+    const moved = press.moved || Math.hypot(tap.x - press.x, tap.y - press.y) > 10;
+    const held = tap.time - press.time > 350;
+    press = null;
     if (moved || held) {
       firstTap = null;
-    } else if (firstTap && tap.time - firstTap.time < 330 && Math.hypot(tap.x - firstTap.x, tap.y - firstTap.y) < 25) {
+      return;
+    }
+    if (onWorkstation && pointRay(tap.x, tap.y)) {
+      const hit = focusRay.intersectObject(workstation.screen)[0];
+      if (hit && !focusRay.intersectObjects(opaqueParts(), false).some(part => part.distance < hit.distance - .001)) {
+        firstTap = null;
+        onWorkstation();
+        return;
+      }
+    }
+    if (event.pointerType !== 'touch') return;
+    if (firstTap && tap.time - firstTap.time < 330 && Math.hypot(tap.x - firstTap.x, tap.y - firstTap.y) < 25) {
       firstTap = null;
       lastTouchFocus = performance.now();
       focusAt(tap.x, tap.y);
     } else firstTap = tap;
   });
-  surface.addEventListener('pointercancel', () => { touchStart = firstTap = null; });
+  surface.addEventListener('pointercancel', () => { press = firstTap = null; });
 
   const resize = () => {
     const { clientWidth: width, clientHeight: height } = container;
     if (!height || !width) return;
-    const ratio = width / height;
-    const halfHeight = Math.max(1.62, 1.25 / ratio);
-    camera.top = halfHeight;
-    camera.bottom = -halfHeight;
-    camera.left = -halfHeight * ratio;
-    camera.right = halfHeight * ratio;
-    camera.updateProjectionMatrix();
+    projection();
     renderer.setSize(width, height);
     dirty = true;
   };
@@ -812,6 +965,12 @@ export function createScene(container) {
   let shadowPending = true, nextShadow = 0;
   return {
     setView,
+    openWorkstation,
+    closeWorkstation,
+    paintWorkstation(...state) {
+      workstation.paint(...state);
+      dirty = true;
+    },
     render(machine, now) {
       const { loaded, manualTool, artifact: hasArtifact, dock } = machine;
       position = machine.position;
@@ -824,7 +983,7 @@ export function createScene(container) {
         if (bridgeMoved) updateCarrier(moving.bridge.position.z);
         moving.carriage.position.x = wx;
         moving.ram.position.y = wy;
-        if (selectedView === 'probe') {
+        if (selectedView === 'probe' && !returnPose && !cameraMotion) {
           const center = probeFocus();
           const shift = center.clone().sub(probeCenter);
           camera.position.add(shift);
@@ -865,6 +1024,7 @@ export function createScene(container) {
         lastOpening = opening;
         dirty = shadowPending = true;
       }
+      animateCamera(now);
       control.update();
       if (webGL && shadowPending && (!moved || now >= nextShadow)) {
         webGL.shadowMap.needsUpdate = dirty = true;

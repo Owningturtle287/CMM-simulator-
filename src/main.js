@@ -1,10 +1,12 @@
 import './style.css';
 import './mobile-mode.css';
+import './workstation.css';
 import { Machine, axes, masterStylus, ports, stylusLabel, travel } from './machine.js';
 import { createScene } from './scene.js';
 import { Console } from './console.js';
 import { layout } from './layout.js';
 import { setupMobileMode } from './mobile-mode.js';
+import { setupWorkstation } from './workstation.js';
 
 document.querySelector('#app').innerHTML = layout();
 const $ = selector => document.querySelector(selector);
@@ -43,8 +45,21 @@ const elements = {
 };
 
 let scene;
+let openingWorkstation = false;
+const workstation = setupWorkstation(machine, () => scene?.closeWorkstation(), releaseInputs);
+function openWorkstation() {
+  if (openingWorkstation) return;
+  releaseInputs();
+  openingWorkstation = true;
+  const open = () => {
+    openingWorkstation = false;
+    workstation.open();
+  };
+  if (!scene?.openWorkstation(open)) open();
+}
+$('[data-workstation]').addEventListener('click', openWorkstation);
 try {
-  scene = createScene($('#viewport'));
+  scene = createScene($('#viewport'), openWorkstation);
 } catch (error) {
   $('#scene-error').hidden = false;
   console.error('Unable to start the 3D preview', error);
@@ -52,6 +67,7 @@ try {
 
 let view = 'iso';
 function setView(name) {
+  if (openingWorkstation) return;
   view = name;
   scene?.setView(name);
   $$('[data-view]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.view === name)));
@@ -164,6 +180,7 @@ select.addEventListener('change', () => {
 $('[data-close-stylus]').addEventListener('click', () => stylusDialog.close());
 $('#artifact').addEventListener('change', event => {
   machine.artifact = event.target.checked;
+  if (!machine.artifact) workstation.fixtureRemoved();
   machine.report(machine.artifact ? 'Reference block placed on the granite.' : 'Reference block removed.');
   updateUI();
 });
@@ -352,6 +369,7 @@ function updateConsoleDisplay(m, coordinates) {
 
 function updateUI() {
   const m = machine;
+  workstation.update(scene?.paintWorkstation);
   const coordinates = {};
   const tip = m.tipPosition;
   for (const axis of axes) {

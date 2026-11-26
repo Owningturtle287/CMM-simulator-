@@ -70,7 +70,8 @@
   left: calc(5px + var(--mobile-safe-left));
   right: calc(5px + var(--mobile-safe-right));
 }
-[data-mobile-layout] .stage-floor .reset { grid-column: 3; width: 32px; height: 32px; }
+[data-mobile-layout] .stage-actions { grid-column: 3; }
+[data-mobile-layout] .stage-actions .icon-button { width: 32px; height: 32px; }
 [data-mobile-layout] .triad { width: 45px; height: 38px; }
 [data-mobile-layout] .stage-hint, [data-mobile-layout] .stage-frame { display: none; }
 [data-mobile-layout] .mobile-readout {

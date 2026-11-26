@@ -21,6 +21,7 @@ The **Deploy simulator to GitHub Pages** workflow tests and builds the app on pu
 
 ## Operation
 
+- Tap the monitor beside the ACCURA or select **PC** to zoom in and open the inspection workstation. The CALYPSO 2025 workflow trainer starts with a blank measurement plan. Set the reference block alignment and clearance, choose a top point or plane, and select characteristics. **Load practice plan** prepares both features. **Run plan** uses the simulated probe and adds contacts to the machine point log. Plan setup can be saved and opened locally from **Plan actions**.
 - **Mobile Mode** runs the 3D view edge to edge in landscape and docks the controller along the bottom. Drag the left joystick for Z and the right joystick for X/Y. Both sticks, Quick Actions, and E-stop stay accessible in the **Jog**, **Functions**, and **Keypad** tabs. The Mobile Mode switch moves onto the controller and saves your preference. Touch devices enable the setting by default. Open **Machine information** for the point log, calibration results and the reference block toggle.
 - Drag the right joystick for X and Y and the left joystick for Z. The desktop keys W/A/S/D and Q/E and the compact iPhone touch controls also jog the machine. The operating-position key rotates the X/Y assignment for the operator’s side.
 - Scroll or pinch over the spot you want to inspect. Double-click or double-tap a machine part to center it and zoom in. Drag to orbit, or use right-drag or two fingers to pan.
@@ -37,6 +38,7 @@ The left bridge foot rides across the flat granite. The right saddle wraps aroun
 
 ## References
 
+- [ZEISS CALYPSO 2025 release notes](https://www.zeiss.com/metrology/us/software/zeiss-calypso/release-notes.html)  and [ZEISS CALYPSO FastStart Guide](https://qualityforum.zeiss.com/migration/images/2500_90afd333c7095004a3a48daa04bb0e88.pdf)
 - [ZEISS BP26SE Control Console Operating Instructions, 61211-5080102](https://qualityforum.zeiss.com/migration/images/164_7f25a8672622a8cf52a1a9a44022dd04.pdf)
 - [ZEISS ACCURA specifications and measuring ranges](https://www.basstool.com/pdf/literature/zeiss/EN_Specifications_ACCURA.pdf)
 - [igus cable carrier guide for linear travel](https://www.igus.com/cable-carriers/resources/e-chain-designing-calculation)
