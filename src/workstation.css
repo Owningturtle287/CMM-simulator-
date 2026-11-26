@@ -179,6 +179,19 @@
   font-weight: 700;
 }
 .workstation-tabs svg { font-size: 17px; }
+.workstation-tab-mark { display: flex; align-items: center; justify-content: center; gap: 4px; }
+.inspection-lamp {
+  display: block;
+  width: 5px;
+  height: 14px;
+  flex: none;
+  border: 1px solid #8498aa;
+  border-radius: 2px;
+  background: #f8fafc;
+}
+.inspection-lamp[data-state=ready] { border-color: #388768; background: #64b899; }
+.inspection-lamp[data-state=motion] { border-color: #966b32; background: #e2b568; }
+.inspection-lamp[data-state=fault] { border-color: #a44250; background: #d96673; }
 .workstation-tabs button[aria-selected=true] {
   color: #194b78;
   background: #fff;
@@ -237,10 +250,41 @@
 .inspection-tree button[aria-current=true] { background: var(--station-selected); border-color: #bdd4ea; }
 .inspection-tree button small { margin-left: auto; color: #4a637a; font-size: 10px; white-space: nowrap; }
 .tree-empty { padding: 6px 4px; color: var(--station-muted); font-size: 11px; }
-.machine-tree { margin: 0; padding: 3px 4px; }
-.machine-tree > div { display: flex; align-items: center; justify-content: space-between; gap: 4px; padding: 5px 2px; border-bottom: 1px solid #e6edf4; font-size: 11px; }
-.machine-tree dd { margin: 0; text-align: right; font-weight: 650; }
-.machine-tree dt { color: var(--station-muted); }
+.cmm-actions { display: grid; gap: 3px; padding: 7px; }
+.workstation-shell .cmm-action {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 4px;
+  border-color: transparent;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 700;
+}
+.cmm-action > .inspection-lamp { width: 6px; height: 30px; }
+.cmm-action-icon {
+  display: grid;
+  place-items: center;
+  width: 39px;
+  height: 37px;
+  border: 1px solid #bccbd8;
+  border-radius: 5px;
+  background: linear-gradient(#f9fbfd, #e4edf5);
+  color: #385a76;
+  font-size: 25px;
+}
+.workstation-shell .cmm-action:disabled { opacity: 1; }
+.cmm-action:disabled .cmm-action-icon { opacity: .55; }
+.cmm-action small { display: block; margin-top: 2px; color: #53677b; font-size: 11px; font-weight: 600; }
+#cmm-settings-dialog { width: min(360px, calc(100% - 30px)); }
+.cmm-settings-status > div, .cmm-settings-speed { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px; }
+.cmm-settings-status > div { padding: 5px 0; border-bottom: 1px solid #e3ebf2; }
+.cmm-settings-status dd { margin: 0; }
+.cmm-settings-speed { margin: 10px 0 3px; font-size: 12px; font-weight: 650; }
+.cmm-settings-speed input { grid-column: 1 / -1; width: 100%; accent-color: #2578ac; }
+.cmm-settings-speed output { font-family: var(--mono); }
 .node-properties {
   display: grid;
   align-content: start;
@@ -366,6 +410,12 @@
   .ribbon-group > span { display: none; }
   .workstation-tabs button { min-height: 40px; gap: 2px; font-size: 9px; }
   .workstation-tabs svg { font-size: 14px; }
+  .workstation-tab-mark { gap: 3px; }
+  .workstation-tab-mark .inspection-lamp { width: 4px; height: 11px; }
+  .cmm-actions { padding: 4px; }
+  .workstation-shell .cmm-action { gap: 6px; font-size: 12px; }
+  .cmm-action-icon { width: 33px; height: 31px; font-size: 21px; }
+  .cmm-action > .inspection-lamp { height: 25px; }
   .inspection-tree summary, .inspection-tree button { min-height: 25px; }
   #inspection-message { font-size: 10px; }
 }

@@ -4,8 +4,8 @@ import { defaultPlan, inspectionBlocker, inspectionResults, practicePlan, runIns
 import { createInspectionView } from './inspection-view.js';
 
 const sections = {
-  cmm: ['CMM', 'front'], plan: ['Measurement Plan', 'document'],
-  checks: ['Characteristics', 'report'], features: ['Features', 'tree'],
+  cmm: ['CMM', 'wrench'], plan: ['Measurement Plan', 'planSheet'],
+  checks: ['Characteristics', 'toleranceFrame'], features: ['Features', 'featureSolids'],
 };
 const featureNames = { point: 'Top point', plane: 'Top plane' };
 const checkNames = { height: 'Top height', variation: 'Sample Z range' };
@@ -22,6 +22,10 @@ function row(key, glyph, label, detail = '') {
 
 function tree(glyph, title, content) {
   return `<details class="inspection-tree" open><summary>${icon(glyph)}<span>${title}</span></summary><ul>${content}</ul></details>`;
+}
+
+function tabMark(id, glyph) {
+  return `<span class="workstation-tab-mark">${id === 'features' ? '' : `<i class="inspection-lamp" id="inspection-tab-lamp-${id}" aria-hidden="true"></i>`}${icon(glyph)}</span>`;
 }
 
 export function workstationLayout() {
@@ -58,18 +62,21 @@ export function workstationLayout() {
       <div class="workstation-content">
         <aside class="workstation-navigator" aria-label="Inspection tree">
           <div class="workstation-tabs" role="tablist" aria-label="Measurement plan sections">
-            ${Object.entries(sections).map(([id, [label, glyph]]) => `<button type="button" role="tab" id="inspection-tab-${id}" data-inspection-pane="${id}" aria-controls="inspection-${id}">${icon(glyph)}<span>${label}</span></button>`).join('')}
+            ${Object.entries(sections).map(([id, [label, glyph]]) => `<button type="button" role="tab" id="inspection-tab-${id}" data-inspection-pane="${id}" aria-controls="inspection-${id}">${tabMark(id, glyph)}<span>${label}</span></button>`).join('')}
           </div>
           <div class="workstation-editor">
             <section id="inspection-cmm" class="inspection-pane" role="tabpanel" aria-labelledby="inspection-tab-cmm" hidden>
-              ${tree('front', 'ACCURA 9/12/8', `
-                <li><dl class="machine-tree">
-                  <div><dt>Drives</dt><dd id="inspection-drives"></dd></div>
-                  <div><dt>Operating mode</dt><dd id="inspection-mode"></dd></div>
-                  <div><dt>Stylus system</dt><dd id="inspection-stylus"></dd></div>
-                  <div><dt>Speed override</dt><dd id="inspection-speed"></dd></div>
-                  <div><dt>Reference block</dt><dd id="inspection-fixture"></dd></div>
-                </dl></li>`)}
+              <div class="cmm-actions">
+                <button type="button" class="cmm-action" id="open-cmm-settings" aria-haspopup="dialog" aria-controls="cmm-settings-dialog">
+                  <i class="inspection-lamp" id="inspection-settings-lamp" aria-hidden="true"></i>
+                  <span class="cmm-action-icon">${icon('machineSettings')}</span><span>CMM Settings</span>
+                </button>
+                <button type="button" class="cmm-action" id="open-cmm-stylus" aria-haspopup="dialog" aria-controls="stylus-dialog">
+                  <i class="inspection-lamp" id="inspection-stylus-lamp" aria-hidden="true"></i>
+                  <span class="cmm-action-icon">${icon('stylusSettings')}</span>
+                  <span>Stylus System<small id="inspection-stylus" aria-live="polite"></small></span>
+                </button>
+              </div>
             </section>
             <section id="inspection-plan" class="inspection-pane" role="tabpanel" aria-labelledby="inspection-tab-plan">
               ${tree('document', '<span id="inspection-tree-name"></span>',
@@ -141,6 +148,21 @@ export function workstationLayout() {
         <span class="workstation-units">mm</span>
       </footer>
     </div>
+  </dialog>
+  <dialog id="cmm-settings-dialog" aria-labelledby="cmm-settings-title">
+    <div class="dialog-head">
+      <h2 id="cmm-settings-title">CMM Settings</h2>
+      <button class="icon-button" type="button" id="close-cmm-settings" aria-label="Close CMM settings">${icon('cross')}</button>
+    </div>
+    <dl class="cmm-settings-status">
+      <div><dt>Drives</dt><dd id="inspection-drives"></dd></div>
+      <div><dt>Operating mode</dt><dd id="inspection-mode"></dd></div>
+      <div><dt>Reference block</dt><dd id="inspection-fixture"></dd></div>
+    </dl>
+    <div class="cmm-settings-speed">
+      <label for="cmm-speed-control">Speed override</label><output id="inspection-speed" for="cmm-speed-control">35%</output>
+      <input id="cmm-speed-control" type="range" data-speed min="0" max="100" value="35">
+    </div>
   </dialog>`;
 }
 
@@ -154,6 +176,12 @@ export function setupWorkstation(machine, close, releaseInputs) {
   const runButton = query('#inspection-run');
   const stop = query('#inspection-stop');
   const machineState = query('#inspection-state');
+  const cmmTabLamp = query('#inspection-tab-lamp-cmm');
+  const cmmSettingsLamp = query('#inspection-settings-lamp');
+  const stylusLamp = query('#inspection-stylus-lamp');
+  const mountedStylus = query('#inspection-stylus');
+  const settings = document.querySelector('#cmm-settings-dialog');
+  const settingsReadout = Object.fromEntries(['drives', 'mode', 'fixture', 'speed'].map(id => [id, settings.querySelector(`#inspection-${id}`)]));
   const planInput = query('#inspection-name');
   const align = query('#inspection-align');
   const clearance = query('#inspection-clearance');
@@ -168,6 +196,17 @@ export function setupWorkstation(machine, close, releaseInputs) {
 
   function text(node, value) {
     if (node.textContent !== value) node.textContent = value;
+  }
+
+  function lamp(node, state) {
+    if (node.dataset.state !== state) node.dataset.state = state;
+  }
+
+  function updateSettingsReadout() {
+    text(settingsReadout.drives, machine.stopped ? 'E-stop latched' : machine.drives ? 'Enabled' : 'Disabled');
+    text(settingsReadout.mode, machine.mode);
+    text(settingsReadout.fixture, machine.artifact ? 'On granite' : 'Removed');
+    text(settingsReadout.speed, `${machine.speed}%`);
   }
 
   function selectNode(id) {
@@ -208,6 +247,8 @@ export function setupWorkstation(machine, close, releaseInputs) {
     text(query('#inspection-align-state'), plan.aligned ? 'Set' : 'Unset');
     const validClearance = plan.clearance >= 10 && plan.clearance <= 150;
     text(query('#inspection-clearance-state'), validClearance ? `${plan.clearance} mm` : 'Unset');
+    lamp(query('#inspection-tab-lamp-plan'), plan.aligned && validClearance ? 'ready' : 'fault');
+    lamp(query('#inspection-tab-lamp-checks'), checks ? 'ready' : 'off');
   }
 
   function replacePlan(next, feedback) {
@@ -313,6 +354,12 @@ export function setupWorkstation(machine, close, releaseInputs) {
   align.addEventListener('change', () => { plan.aligned = align.checked; notice = ''; syncPlan(); });
   clearance.addEventListener('input', () => { plan.clearance = clearance.valueAsNumber; notice = ''; syncPlan(); });
   query('#workstation-close').addEventListener('click', () => dialog.close());
+  query('#open-cmm-settings').addEventListener('click', () => {
+    releaseInputs();
+    updateSettingsReadout();
+    settings.showModal();
+  });
+  settings.querySelector('#close-cmm-settings').addEventListener('click', () => settings.close());
   dialog.addEventListener('close', close);
   replacePlan(plan, '');
 
@@ -364,12 +411,12 @@ export function setupWorkstation(machine, close, releaseInputs) {
       text(machineState, status);
       const state = machine.stopped || machine.fault ? 'fault' : machine.plan ? 'motion' : machine.drives ? 'ready' : 'off';
       if (machineState.dataset.state !== state) machineState.dataset.state = state;
-      text(query('#inspection-drives'), machine.drives ? 'Enabled' : 'Disabled');
-      text(query('#inspection-mode'), machine.mode);
-      text(query('#inspection-stylus'), machine.loaded ? stylusLabel(ports[machine.loaded - 1]) : 'No stylus mounted');
-      text(query('#inspection-speed'), `${machine.speed}%`);
-      text(query('#inspection-fixture'), machine.artifact ? 'On granite' : 'Removed');
-      text(message, running ? machine.message : notice || blocker || 'Ready to run the measurement plan.');
+      lamp(cmmTabLamp, state === 'ready' && !machine.loaded ? 'fault' : state);
+      lamp(cmmSettingsLamp, state);
+      lamp(stylusLamp, machine.loaded ? 'ready' : 'fault');
+      text(mountedStylus, machine.loaded ? stylusLabel(ports[machine.loaded - 1]) : 'No stylus mounted');
+      if (settings.open) updateSettingsReadout();
+      text(message, machine.plan || pane === 'cmm' ? machine.message : notice || blocker || 'Ready to run the measurement plan.');
       const tip = machine.tipPosition;
       for (const position of positions) text(position, tip[position.dataset.inspectionAxis].toFixed(3));
       runButton.disabled = Boolean(blocker);

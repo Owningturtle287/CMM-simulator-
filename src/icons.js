@@ -1,3 +1,5 @@
+const wrench = '<path d="M21 4.5 18 7.6l-2-.6-.6-2L18.5 2A5.5 5.5 0 0 0 12 8.6l-8.1 8.1a2.4 2.4 0 1 0 3.4 3.4l8.1-8.1A5.5 5.5 0 0 0 21 4.5Z"/>';
+
 const paths = {
   rack: '<path d="M3 19v-5h18v5M5 19v-5m14 5v-5M7 6v5m5-5v5m5-5v5M5 6h4m1 0h4m1 0h4"/>',
   chevron: '<path d="m6 9 6 6 6-6"/>',
@@ -32,6 +34,12 @@ const paths = {
   report: '<rect x="5" y="4" width="14" height="16" rx="2"/><path d="M8 16v-4m4 4V8m4 8v-6"/>',
   tree: '<path d="M5 4v16m0-13h5m-5 5h13m-13 5h9"/><circle cx="13" cy="7" r="2"/><circle cx="20" cy="12" r="2"/><circle cx="16" cy="17" r="2"/>',
   axes: '<path d="M5 19V4m-2 2 2-2 2 2M5 19h15m-2-2 2 2-2 2M5 19 16 8m-4 0h4v4"/>',
+  wrench,
+  planSheet: '<path d="M4 3h10l4 4v6M4 3v18h8M14 3v5h4M7 8h4m-4 4h6m-6 4h4"/><path d="m17 13 1-1 2 1 .2 1.3 1.3.7v2.4l-1.3.7-.2 1.4-2 1-1.2-.7-1.3.3-1.7-1.6.4-1.4-.5-1.2 1.3-1.9 1.3.1Z"/><circle cx="18" cy="16.5" r="1.15"/>',
+  toleranceFrame: '<rect x="3" y="6" width="18" height="12" rx="1"/><path d="M10 6v12m6-12v12M5 14l3-4m4 2h2m-1-1v2m5-1h1"/>',
+  featureSolids: '<path d="m6 4 4 10c0 1-2 2-4 2s-4-1-4-2L6 4ZM13 5v6c0 1 1.8 2 4 2s4-1 4-2V5"/><ellipse cx="17" cy="5" rx="4" ry="2"/><circle cx="13.5" cy="17.5" r="3.5"/>',
+  machineSettings: `<path d="M3 4h13v10H3zM1.5 14h16l-2 3H3.5zM7 11V7h5m-2 0v3"/><g transform="translate(9 8) scale(.63)">${wrench}</g>`,
+  stylusSettings: `<path d="M7 3v13m0-9h6m-6 5-3 4"/><circle cx="14" cy="7" r="1.8" fill="#bd4054" stroke="#bd4054"/><circle cx="7" cy="18" r="1.8" fill="#bd4054" stroke="#bd4054"/><g transform="translate(9 8) scale(.63)">${wrench}</g>`,
 };
 
 export function icon(name, extra = '') {

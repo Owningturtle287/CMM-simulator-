@@ -26,6 +26,7 @@ const elements = {
   mode: $('#mode'),
   drives: $('#drive-status'),
   stylus: $('#active-stylus'),
+  workstationStylus: $('#open-cmm-stylus'),
   speed: $('#speed-value'),
   speedControls: $$('[data-speed]'),
   dial: $('.dial'),
@@ -153,12 +154,16 @@ elements.speedControls.forEach(input => input.addEventListener('input', () => {
   machine.speed = Number(input.value);
   updateUI();
 }));
+function openStylusPicker() {
+  releaseInputs();
+  if (!stylusDialog.open) stylusDialog.showModal();
+}
+elements.workstationStylus.addEventListener('click', openStylusPicker);
 quickActions.addEventListener('change', () => {
   const action = quickActions.value;
   quickActions.value = '';
   if (action === 'stylus') {
-    releaseInputs();
-    stylusDialog.showModal();
+    openStylusPicker();
   } else if (action === 'calibrate') {
     releaseInputs();
     machine.startMasterCalibration();
@@ -398,7 +403,7 @@ function updateUI() {
     elements.speedControls.forEach(input => { if (Number(input.value) !== m.speed) input.value = m.speed; });
     elements.dial.style.setProperty('--angle', `${-135 + 2.7 * m.speed}deg`);
     const available = m.drives && !m.stopped && !m.plan && !m.fault && m.mode === 'AUTO';
-    select.disabled = quickActions.options[1].disabled = !available;
+    select.disabled = quickActions.options[1].disabled = elements.workstationStylus.disabled = !available;
     quickActions.options[2].disabled = !available || m.manualTool === masterStylus.id;
     quickActions.options[3].disabled = quickActions.options[3].hidden = !m.plan;
     for (const option of portOptions) {
