@@ -122,6 +122,9 @@ function materials() {
     steel: metal(0x9eacb8, 0.99, 0.18),
     ram: metal(0x535045, 0.52, 0.42, { roughnessMap: brush }),
     ramEdge: metal(0x827d6a, 0.62, 0.36, { roughnessMap: brush }),
+    carrierPin: metal(0x454d54, 0.46, 0.44),
+    hose: metal(0x17465c, 0.08, 0.47),
+    guardYellow: metal(0xf1c321, 0.08, 0.38),
     referenceCeramic: metal(0xf2e5bf, 0.0, 0.32),
     referenceStand: metal(0x21262a, 0.32, 0.43),
     markRed: metal(0xa41620, 0.13, 0.30),
@@ -138,11 +141,9 @@ function materials() {
 }
 
 function buildBase(scene, m) {
-  // The right-hand guide is a granite step. Both guides extend to the bridge end stops.
   box(scene, m.graniteEdge, 1.733, 0.442, 1.94, 0, -0.239, -0.023, 0.021);
   box(scene, m.granite, 1.731, 0.047, 1.938, 0, -0.0235, -0.023, 0.014);
-  box(scene, m.granite, 0.266, 0.109, 1.935, 0.758, 0.054, -0.023, 0.009);
-  box(scene, m.granite, 0.143, 0.024, 1.888, -0.674, 0.011, -0.024, 0.007);
+  buildYGuide(scene, m);
   for (const x of [-0.689, 0.689]) {
     for (const z of [-0.704, 0.058, 0.719]) {
       box(scene, m.black, 0.231, 0.032, 0.201, x, -0.685, z, 0.014);
@@ -152,9 +153,6 @@ function buildBase(scene, m) {
       for (const dx of [-0.078, 0.078]) cylinder(scene, m.aluminum, 0.015, 0.027, x + dx, -0.66, z, 6);
     }
   }
-  const vents = group(scene, 0.795, -0.35, -0.676);
-  box(vents, m.black, 0.188, 0.269, 0.292, 0, 0, 0, 0.035);
-  for (let i = 0; i < 6; i++) box(vents, m.rubber, 0.006, 0.012, 0.197, 0.095, -0.084 + i * 0.031, 0, 0.003);
   const threadColors = [m.black, m.steel];
   for (const x of [-0.45, -0.225, 0, 0.225, 0.45]) {
     for (const z of [0.65, 0.27, -0.12]) {
@@ -164,15 +162,117 @@ function buildBase(scene, m) {
   }
 }
 
+function buildYGuide(base, m) {
+  // The raised granite way overhangs the table. The tray and both end modules are fixed to the base.
+  box(base, m.granite, 0.248, 0.112, 1.943, 0.802, 0.056, -0.022, 0.005);
+  for (const z of [-0.995, 0.951]) transverseFastener(base, m.steel, 0.010, 0.004, 0.810, 0.048, z);
+  box(base, m.black, 0.205, 0.030, 1.966, 0.956, -0.435, -0.024, 0.006);
+  box(base, m.carrierPin, 0.128, 0.004, 1.852, 1.009, -0.419, -0.024);
+  box(base, m.black, 0.018, 0.058, 1.943, 0.939, -0.406, -0.024, 0.004);
+  box(base, m.black, 0.017, 0.032, 1.958, 1.073, -0.421, -0.024, 0.003);
+  box(base, m.black, 0.181, 0.110, 0.266, 0.960, -0.476, 0.156, 0.012);
+  box(base, m.edge, 0.126, 0.012, 0.062, 1.009, -0.412, 0.064, 0.003);
+  for (const z of [-0.941, 0.924]) {
+    box(base, m.black, 0.093, 0.158, 0.123, 0.948, -0.500, z, 0.008);
+    const end = group(base, 1.010, -0.553, z);
+    box(end, m.guardYellow, 0.089, 0.087, 0.083, 0, 0, 0, 0.014);
+    box(end, m.rubber, 0.086, 0.033, 0.079, 0, 0.046, 0, 0.011);
+    box(end, m.black, 0.079, 0.015, 0.069, 0, -0.048, 0, 0.007);
+    box(end, m.markRed, 0.003, 0.008, 0.009, 0.045, -0.008, 0.017, 0.001);
+  }
+}
+
+function buildYSaddle(bridge, m) {
+  // The open profile passes over the granite, with separate inboard and outboard skirts.
+  const profile = [
+    [0.540, 0.022], [0.669, 0.022], [0.669, 0.118], [0.935, 0.118],
+    [0.935, -0.098], [0.958, -0.142], [1.015, -0.142], [1.051, -0.112],
+    [1.064, 0.056], [1.045, 0.152], [1.008, 0.203], [0.562, 0.211], [0.540, 0.187],
+  ].map(([x, y]) => new THREE.Vector2(x, y));
+  const back = profile.map(({ x, y }) => new THREE.Vector3(x, y, -0.213));
+  const front = profile.map(({ x, y }) => new THREE.Vector3(x, y, 0.221));
+  const faces = [];
+  for (const triangle of THREE.ShapeUtils.triangulateShape(profile, [])) {
+    faces.push(triangle.map(i => front[i]), triangle.slice().reverse().map(i => back[i]));
+  }
+  for (let i = 0; i < profile.length; i++) {
+    const next = (i + 1) % profile.length;
+    faces.push([back[i], back[next], front[next], front[i]]);
+  }
+  facetedMesh(bridge, m.black, faces);
+  box(bridge, m.rubber, 0.220, 0.004, 0.374, 0.802, 0.116, 0.004);
+  box(bridge, m.edge, 0.007, 0.024, 0.352, 0.665, 0.070, 0.004, 0.002);
+  box(bridge, m.edge, 0.007, 0.030, 0.351, 0.939, 0.060, 0.004, 0.002);
+  box(bridge, m.black, 0.034, 0.196, 0.274, 1.052, 0.021, 0.004, 0.011);
+  box(bridge, m.aluminum, 0.036, 0.182, 0.258, 1.067, 0.022, 0.004, 0.010);
+  for (let i = 0; i < 8; i++) {
+    box(bridge, m.aluminum, 0.015, 0.007, 0.243, 1.089, 0.100 - i * 0.015, 0.004, 0.002);
+  }
+  box(bridge, m.edge, 0.025, 0.131, 0.036, 1.093, 0.054, -0.012, 0.007);
+  box(bridge, m.edge, 0.036, 0.042, 0.256, 1.072, -0.051, 0.004, 0.008);
+  for (const z of [-0.098, 0.105]) transverseFastener(bridge, m.steel, 0.005, 0.005, 1.091, -0.049, z, true);
+  box(bridge, m.black, 0.057, 0.113, 0.056, 1.009, -0.193, 0.094, 0.009);
+  box(bridge, m.steel, 0.115, 0.014, 0.070, 1.009, -0.247, 0.094, 0.003);
+}
+
+function buildYCarrier(scene, m, instanced) {
+  const x = 1.009, bottom = -0.397, fixed = 0.064, radius = 0.071;
+  const straight = 0.820;
+  const count = 38;
+  const pitch = (straight + Math.PI * radius) / count;
+  const parts = [
+    [-0.046, 0, 0.017, 0.028, pitch - 0.001, m.black],
+    [0.046, 0, 0.017, 0.028, pitch - 0.001, m.black],
+    [0, 0.011, 0.099, 0.008, 0.015, m.carrierPin],
+    [-0.028, -0.002, 0.011, 0.011, pitch, m.hose],
+  ].map(([shiftX, shiftY, w, h, d, material]) => ({
+    shiftX, shiftY, material, geometry: new THREE.BoxGeometry(w, h, d),
+  }));
+  const batches = instanced ? parts.map(part => {
+    const mesh = new THREE.InstancedMesh(part.geometry, part.material, count);
+    mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(x, -0.32, 0.09), 0.98);
+    mesh.castShadow = mesh.receiveShadow = true;
+    scene.add(mesh);
+    return { mesh, offset: new THREE.Matrix4().makeTranslation(part.shiftX, part.shiftY, 0) };
+  }) : null;
+  const links = batches ? null : Array.from({ length: count }, () => {
+    const link = group(scene);
+    for (const part of parts) addMesh(link, part.geometry, part.material, part.shiftX, part.shiftY, 0);
+    return link;
+  });
+  const pose = new THREE.Object3D();
+  const transform = new THREE.Matrix4();
+  return bridgeZ => {
+    const movingEnd = bridgeZ + 0.094;
+    // The bend moves at half the saddle speed, exchanging length between the two straight runs.
+    const bend = (straight + fixed + movingEnd) / 2;
+    const lowerRun = bend - fixed;
+    const bendLength = Math.PI * radius;
+    for (let i = 0; i < count; i++) {
+      const distance = (i + 0.5) * pitch;
+      const fromBend = distance - lowerRun;
+      const angle = Math.min(Math.PI, Math.max(0, fromBend / radius));
+      const y = bottom + radius * (1 - Math.cos(angle));
+      const z = bend + radius * Math.sin(angle) + Math.min(0, fromBend) - Math.max(0, fromBend - bendLength);
+      const link = links ? links[i] : pose;
+      link.position.set(x, y, z);
+      link.rotation.x = -angle;
+      if (batches) {
+        pose.updateMatrix();
+        for (const { mesh, offset } of batches) mesh.setMatrixAt(i, transform.multiplyMatrices(pose.matrix, offset));
+      }
+    }
+    if (batches) for (const { mesh } of batches) mesh.instanceMatrix.needsUpdate = true;
+  };
+}
+
 function buildBridge(scene, m, mark) {
   const bridge = group(scene);
   const right = 0.706;
-  // A shallow saddle rides above the step. The inboard skirt drops beside it.
-  box(bridge, m.black, 0.344, 0.102, 0.438, right - 0.014, 0.165, 0.004, 0.016);
-  box(bridge, m.black, 0.093, 0.137, 0.429, 0.573, 0.083, 0.004, 0.012);
-  box(bridge, m.rubber, 0.237, 0.009, 0.405, 0.746, 0.113, 0.004, 0.004);
-  box(bridge, m.black, 0.187, 0.044, 0.234, -0.663, 0.046, 0.022, 0.009);
-  box(bridge, m.white, 0.19, 1.294, 0.213, -0.663, 0.716, 0.025, 0.019);
+  buildYSaddle(bridge, m);
+  box(bridge, m.rubber, 0.181, 0.007, 0.207, -0.663, 0.004, 0.025, 0.003);
+  box(bridge, m.white, 0.19, 1.356, 0.213, -0.663, 0.685, 0.025, 0.012);
   box(bridge, m.white, 0.282, 1.156, 0.36, right, 0.786, 0.01, 0.02);
   box(bridge, m.edge, 0.010, 1.125, 0.282, 0.845, 0.786, 0.008, 0.005);
   box(bridge, m.white, 0.007, 1.107, 0.263, 0.85, 0.792, 0.008, 0.003);
@@ -586,6 +686,7 @@ export function createScene(container) {
   const base = group(scene);
   buildBase(base, m);
   const moving = buildBridge(scene, m, mark);
+  const updateCarrier = buildYCarrier(scene, m, Boolean(webGL));
   const adapter = buildAdapter(m, mark);
   if (webGL) batchOpaque(adapter);
   const { fixed: rackFrame, stations } = buildRack(scene, m, adapter);
@@ -716,9 +817,11 @@ export function createScene(container) {
       position = machine.position;
       const moved = x !== position.x || y !== position.y || z !== position.z;
       if (moved) {
+        const bridgeMoved = y !== position.y;
         ({ x, y, z } = position);
         const [wx, wy, wz] = worldPosition(position);
         moving.bridge.position.z = wz - frame.ramLead / 1000;
+        if (bridgeMoved) updateCarrier(moving.bridge.position.z);
         moving.carriage.position.x = wx;
         moving.ram.position.y = wy;
         if (selectedView === 'probe') {

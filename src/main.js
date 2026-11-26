@@ -31,6 +31,7 @@ const elements = {
   lcd: $('#lcd'),
   touchLcd: $('#mobile-lcd'),
   touchSpeed: $('#touch-speed-value'),
+  touchSpeedTrack: $('.touch-speed-track'),
   touchLock: $('#touch-lock-label'),
   touchStop: $('#touch-stop-label'),
   touchSide: $('#touch-side-label'),
@@ -375,6 +376,7 @@ function updateUI() {
     setText(elements.stylus, port ? stylusLabel(port) : 'Unloaded');
     setText(elements.speed, `${m.speed}%`);
     setText(elements.touchSpeed, `${m.speed}%`);
+    elements.touchSpeedTrack.style.setProperty('--speed-override', `${m.speed}%`);
     elements.speedControls.forEach(input => { if (Number(input.value) !== m.speed) input.value = m.speed; });
     elements.dial.style.setProperty('--angle', `${-135 + 2.7 * m.speed}deg`);
     const available = m.drives && !m.stopped && !m.plan && !m.fault && m.mode === 'AUTO';

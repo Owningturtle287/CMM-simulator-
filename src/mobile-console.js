@@ -36,7 +36,12 @@ export function mobileConsole(joystick, logo) {
         </div>
         <div class="touch-speed">
           <label for="touch-speed">Speed</label><output id="touch-speed-value" for="touch-speed">35%</output>
-          <input id="touch-speed" type="range" data-speed min="0" max="100" value="35">
+          <div class="touch-speed-track">
+            <input id="touch-speed" type="range" data-speed min="0" max="100" value="35">
+            <div class="touch-speed-scale" aria-hidden="true">
+              ${Array.from({ length: 11 }, (_, i) => `<i class="${i % 5 === 0 ? 'major' : ''}"></i>`).join('')}
+            </div>
+          </div>
         </div>
       </section>
       <section id="touch-functions" class="touch-panel touch-keys touch-functions" role="tabpanel" aria-labelledby="touch-tab-functions" hidden>

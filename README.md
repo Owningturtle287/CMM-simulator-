@@ -33,10 +33,13 @@ The **Deploy simulator to GitHub Pages** workflow tests and builds the app on pu
 
 The working envelope is 900 × 1,200 × 800 mm, using the documented ACCURA 9/12/8 variant. From the front, X increases to the right, Y away from the operator and Z away from the granite. Machine zero is at the lower front-left of the simulated measuring volume, with the bridge saddle near the front of its stepped granite guide. The rear rack uses additional modeled service travel from Y = 1,200 to 1,460 mm. The readout follows the virtual tip datum, and when unloaded it follows the corresponding nominal tip plane. Home parks X and Y at 0 and Z at 800 mm. Geometry and setup were modeled from reference photos. Docking clearances, the covered-socket animation, practice contact and speed are simulation parameters. The simulator adds the two Dynamic Tensor demonstration passes to the master-reference cycle and reports a geometric fit from simulated data. The passes use modeled rates of 8 and 40 mm/s.
 
+The left bridge foot rides across the flat granite. The right saddle wraps around a raised guide and carries the finned side cover and one end of the cable carrier. The carrier keeps a fixed total length as its bend moves along the tray during Y travel.
+
 ## References
 
 - [ZEISS BP26SE Control Console Operating Instructions, 61211-5080102](https://qualityforum.zeiss.com/migration/images/164_7f25a8672622a8cf52a1a9a44022dd04.pdf)
 - [ZEISS ACCURA specifications and measuring ranges](https://www.basstool.com/pdf/literature/zeiss/EN_Specifications_ACCURA.pdf)
+- [igus cable carrier guide for linear travel](https://www.igus.com/cable-carriers/resources/e-chain-designing-calculation)
 - [ZEISS Multi Sensor Rack overview](https://asset-downloads.zeiss.com/catalogs/download/iqs/7a9556cb-72be-4ed7-b5ef-da51d3d837e4/ZEISS_MSR_DINA4_V3.pdf.pdf)
 - [ZEISS logo file and attribution](https://commons.wikimedia.org/wiki/File:Zeiss_logo.svg)
 - [ZEISS contact probing systems, VAST XT gold and magnetic stylus attachment](https://asset-downloads.zeiss.com/catalogs/download/iqs/e969880b-6fb4-47ad-9864-835ac06d2d00/BA_Sensorik_taktil_REV_1_0_en.pdf.pdf)
