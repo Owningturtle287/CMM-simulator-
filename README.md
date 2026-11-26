@@ -21,7 +21,7 @@ The **Deploy simulator to GitHub Pages** workflow tests and builds the app on pu
 
 ## Operation
 
-- **Mobile Mode** gives the 3D view about two-thirds of the landscape screen and docks the controller below. Drag the left joystick for Z and the right joystick for X/Y. Both sticks, Quick Actions, and E-stop stay accessible in the **Jog**, **Functions**, and **Keypad** tabs. The Mobile Mode switch moves onto the controller and saves your preference. Touch devices enable the setting by default. Open **Machine information** for the point log, calibration results and the reference block toggle.
+- **Mobile Mode** runs the 3D view edge to edge in landscape and docks the controller along the bottom. Drag the left joystick for Z and the right joystick for X/Y. Both sticks, Quick Actions, and E-stop stay accessible in the **Jog**, **Functions**, and **Keypad** tabs. The Mobile Mode switch moves onto the controller and saves your preference. Touch devices enable the setting by default. Open **Machine information** for the point log, calibration results and the reference block toggle.
 - Drag the right joystick for X and Y and the left joystick for Z. The desktop keys W/A/S/D and Q/E and the compact iPhone touch controls also jog the machine. The operating-position key rotates the X/Y assignment for the operator’s side.
 - Scroll or pinch over the spot you want to inspect. Double-click or double-tap a machine part to center it and zoom in. Drag to orbit, or use right-drag or two fingers to pan.
 - **M** toggles the drives. Pressing the mushroom latches the emergency stop immediately. Pressing it again simulates twisting it loose. The drives stay disabled until **M** is pressed. The joystick unlock buttons restore manual jogging after 60 seconds of inactivity.

@@ -36,23 +36,26 @@
 [data-mobile-layout] #app { height: 100vh; height: 100dvh; }
 [data-mobile-layout] .topbar, [data-mobile-layout] .workspace > :is(.controls, footer) { display: none; }
 [data-mobile-layout] .workspace {
+  --mobile-safe-top: env(safe-area-inset-top, 0px);
+  --mobile-safe-right: env(safe-area-inset-right, 0px);
+  --mobile-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --mobile-safe-left: env(safe-area-inset-left, 0px);
   display: grid;
-  grid-template-rows: minmax(0, 2fr) minmax(0, 1fr);
-  gap: 4px;
+  grid-template-rows: minmax(0, 1fr) max(84px, 28%);
+  gap: 2px;
   max-width: none;
   height: 100%;
-  padding: max(4px, env(safe-area-inset-top)) max(4px, env(safe-area-inset-right))
-    max(4px, env(safe-area-inset-bottom)) max(4px, env(safe-area-inset-left));
+  padding: 0 0 max(2px, var(--mobile-safe-bottom));
 }
 [data-mobile-layout] .workbench { display: contents; }
 
-[data-mobile-layout] .stage { position: relative; min-height: 0; border-radius: 8px; }
+[data-mobile-layout] .stage { position: relative; min-height: 0; border: 0; border-radius: 0; box-shadow: none; }
 [data-mobile-layout] .viewport { min-height: 0; height: auto; flex: 1 1 0; }
 [data-mobile-layout] .stage-head {
   position: absolute;
   z-index: 1;
-  top: 5px;
-  left: 5px;
+  top: calc(5px + var(--mobile-safe-top));
+  left: calc(5px + var(--mobile-safe-left));
   border: 0;
   background: none;
   padding: 0;
@@ -62,14 +65,18 @@
 [data-mobile-layout] .view-tools button { min-height: 28px; gap: 3px; padding: 3px 5px; }
 [data-mobile-layout] .view-tools button span { display: inline; font-size: 10px; }
 [data-mobile-layout] .view-tools svg { font-size: 13px; }
-[data-mobile-layout] .stage-floor { bottom: 5px; inset-inline: 5px; }
+[data-mobile-layout] .stage-floor {
+  bottom: 5px;
+  left: calc(5px + var(--mobile-safe-left));
+  right: calc(5px + var(--mobile-safe-right));
+}
 [data-mobile-layout] .stage-floor .reset { grid-column: 3; width: 32px; height: 32px; }
 [data-mobile-layout] .triad { width: 45px; height: 38px; }
 [data-mobile-layout] .stage-hint, [data-mobile-layout] .stage-frame { display: none; }
 [data-mobile-layout] .mobile-readout {
   position: absolute;
-  top: 5px;
-  right: 5px;
+  top: calc(5px + var(--mobile-safe-top));
+  right: calc(5px + var(--mobile-safe-right));
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 1px;
@@ -94,8 +101,8 @@
 [data-mobile-layout] .stage-status {
   position: absolute;
   bottom: 6px;
-  left: 51px;
-  max-width: calc(52% - 45px);
+  left: calc(51px + var(--mobile-safe-left));
+  max-width: calc(52% - 45px - var(--mobile-safe-left));
   min-height: 24px;
   padding: 4px 6px;
   font-size: 10px;
@@ -114,7 +121,9 @@
   gap: 4px;
   min-width: 0;
   min-height: 0;
-  padding: 4px;
+  margin-left: max(4px, var(--mobile-safe-left));
+  margin-right: max(4px, var(--mobile-safe-right));
+  padding: 3px 4px;
   border: 1px solid #909aa2;
   border-radius: 9px;
   color: #f4f6f7;
@@ -160,11 +169,11 @@
 .touch-face {
   container-type: inline-size;
   display: grid;
-  grid-template-rows: clamp(27px, 8.6dvh, 39px) minmax(0, 1fr);
+  grid-template-rows: clamp(27px, 8dvh, 38px) minmax(0, 1fr);
   gap: 4px;
   min-width: 0;
   min-height: 0;
-  padding: 4px;
+  padding: 3px 4px;
   border: 1px solid #252c32;
   border-radius: 6px;
   background: linear-gradient(150deg, #42494f, #262c32);
@@ -355,7 +364,7 @@
 #machine-info .artifact-option { display: flex; align-items: center; gap: 5px; margin-top: 8px; font-size: 12px; }
 #machine-info .artifact-option input { accent-color: var(--blue); }
 
-@media (max-width: 670px) {
+@container (max-width: 550px) {
   .touch-utilities .tool-control svg:first-child { display: none; }
 }
 @container (max-width: 390px) {
