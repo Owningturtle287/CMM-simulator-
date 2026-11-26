@@ -654,30 +654,45 @@ function buildWorkstation(scene, m) {
   const screen = decal(monitor, texture, 0.580, 0.326, 0, 0.007, 0.020);
   screen.material.toneMapped = false;
   function paint(plan, status, section) {
-    ctx.fillStyle = '#14243a'; ctx.fillRect(0, 0, 1024, 576);
-    ctx.fillStyle = '#243b55'; ctx.fillRect(0, 0, 1024, 107);
-    ctx.fillStyle = '#63dbca'; ctx.fillRect(0, 103, 1024, 4);
-    ctx.fillStyle = '#f3f7ff'; ctx.font = '700 42px system-ui'; ctx.fillText('Inspection workstation', 38, 57);
-    ctx.fillStyle = '#a8c5dd'; ctx.font = '500 22px system-ui'; ctx.fillText('CALYPSO 2025 workflow trainer', 40, 88);
-    ctx.fillStyle = '#1d3148'; ctx.fillRect(0, 108, 245, 468);
-    for (const [index, name] of ['Setup', 'Features', 'Characteristics', 'Results'].entries()) {
-      const y = 140 + index * 73;
-      if (section === name) { ctx.fillStyle = '#2a5967'; ctx.fillRect(18, y, 207, 55); }
-      ctx.fillStyle = '#e2edf8'; ctx.font = '600 23px system-ui'; ctx.fillText(name, 40, y + 36);
+    ctx.fillStyle = '#edf2f7'; ctx.fillRect(0, 0, 1024, 576);
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, 1024, 92); ctx.fillRect(0, 163, 346, 366);
+    ctx.fillStyle = '#1f3953'; ctx.font = '700 37px system-ui'; ctx.fillText('Inspection workstation', 31, 48);
+    ctx.fillStyle = '#596f83'; ctx.font = '500 22px system-ui'; ctx.fillText('CALYPSO 2025 workflow trainer', 32, 78);
+    ctx.fillStyle = '#e2ebf3'; ctx.fillRect(0, 92, 1024, 71);
+    ctx.fillStyle = '#315a7a'; ctx.font = '650 21px system-ui';
+    for (const [index, name] of ['New', 'Open', 'Save', 'Practice', 'Point', 'Plane', 'Views', 'Run'].entries()) {
+      const x = 31 + index * 119;
+      ctx.strokeStyle = '#557b9a'; ctx.lineWidth = 2; ctx.strokeRect(x, 104, 18, 17);
+      ctx.fillText(name, x, 145);
     }
-    ctx.fillStyle = '#edf5ff'; ctx.font = '600 33px system-ui'; ctx.fillText(plan, 283, 166, 690);
-    ctx.fillStyle = '#65d7c6'; ctx.font = '600 22px system-ui'; ctx.fillText(status, 285, 207, 680);
-    ctx.fillStyle = '#263e56'; ctx.fillRect(283, 241, 690, 235);
-    ctx.fillStyle = '#4d758e'; ctx.fillRect(499, 289, 243, 135);
-    ctx.strokeStyle = '#a4c4d9'; ctx.lineWidth = 3; ctx.strokeRect(499, 289, 243, 135);
-    ctx.fillStyle = '#a2eadf';
-    for (const [x, y] of [[621, 355], [540, 323], [702, 323], [540, 390], [702, 390]]) {
-      ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI * 2); ctx.fill();
+    for (const [index, name] of ['CMM', 'Measurement Plan', 'Characteristics', 'Features'].entries()) {
+      const y = 187 + index * 51;
+      if (section === name) { ctx.fillStyle = '#dcebf8'; ctx.fillRect(13, y, 319, 43); }
+      ctx.fillStyle = '#36516b'; ctx.font = '650 22px system-ui'; ctx.fillText(name, 28, y + 29);
     }
-    ctx.fillStyle = '#edf5ff'; ctx.font = '600 25px system-ui'; ctx.fillText('Open workstation', 283, 529);
+    ctx.fillStyle = '#233e59'; ctx.font = '650 24px system-ui'; ctx.fillText(plan, 25, 431, 300);
+    ctx.fillStyle = '#71869a'; ctx.font = '500 18px system-ui'; ctx.fillText('Reference block', 372, 199);
+    function face(color, points) {
+      ctx.beginPath();
+      ctx.moveTo(...points[0]);
+      for (const vertex of points.slice(1)) ctx.lineTo(...vertex);
+      ctx.closePath();
+      ctx.fillStyle = color; ctx.fill();
+      ctx.lineWidth = 2; ctx.strokeStyle = '#516e88'; ctx.stroke();
+    }
+    face('#7f9bb4', [[513, 350], [696, 411], [696, 464], [513, 403]]);
+    face('#6286a5', [[696, 411], [879, 327], [879, 379], [696, 464]]);
+    face('#bdd0df', [[513, 350], [696, 411], [879, 327], [696, 267]]);
+    ctx.fillStyle = '#456279';
+    for (const [x, y] of [[620, 342], [696, 307], [696, 374], [772, 339]]) {
+      ctx.beginPath(); ctx.ellipse(x, y, 16, 8, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.fillStyle = '#f9fbfd'; ctx.fillRect(0, 529, 1024, 47);
+    ctx.fillStyle = '#265c4f'; ctx.font = '650 19px system-ui'; ctx.fillText(status, 25, 560, 620);
+    ctx.fillStyle = '#355b80'; ctx.fillText('Open workstation', 803, 560);
     texture.needsUpdate = true;
   }
-  paint('Untitled measurement plan', 'Machine ready · AUTO', 'Setup');
+  paint('Untitled measurement plan', 'Machine ready · AUTO', 'Measurement Plan');
   return { desk, screen, paint };
 }
 

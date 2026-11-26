@@ -106,7 +106,7 @@ function drawFace(ctx, surface, patterns) {
   ctx.stroke();
 }
 
-export function createSoftwareView() {
+export function createSoftwareView({ floorY = -0.704, gridSize = 8, gridDivisions = 16, contactShadow = true } = {}) {
   const domElement = document.createElement('canvas');
   const ctx = domElement.getContext('2d', { alpha: false });
   if (!ctx) throw Error('No canvas graphics context is available.');
@@ -136,15 +136,18 @@ export function createSoftwareView() {
     ctx.lineWidth = 0.7;
     ctx.strokeStyle = 'rgba(124,146,164,0.25)';
     ctx.beginPath();
-    for (let i = -8; i <= 8; i++) {
-      const a = world(i / 2, -0.703, -4), b = world(i / 2, -0.703, 4);
-      const c = world(-4, -0.703, i / 2), d = world(4, -0.703, i / 2);
+    const half = gridSize / 2;
+    for (let i = 0; i <= gridDivisions; i++) {
+      const at = i * gridSize / gridDivisions - half;
+      const a = world(at, floorY + 0.001, -half), b = world(at, floorY + 0.001, half);
+      const c = world(-half, floorY + 0.001, at), d = world(half, floorY + 0.001, at);
       ctx.moveTo(a.x, a.y);
       ctx.lineTo(b.x, b.y);
       ctx.moveTo(c.x, c.y);
       ctx.lineTo(d.x, d.y);
     }
     ctx.stroke();
+    if (!contactShadow) return;
     for (let i = 11; i > 0; i--) {
       const edge = i * 0.018;
       outline(ctx, [

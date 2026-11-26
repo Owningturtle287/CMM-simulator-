@@ -37,20 +37,26 @@ export function inspectionBlocker(machine, plan) {
   return '';
 }
 
+export function inspectionTargets(features) {
+  const { width, depth } = workpiece;
+  const targets = [];
+  if (features.point) targets.push({ feature: 'Point', x: 0, y: 0 });
+  if (features.plane) {
+    for (const [dx, dy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+      targets.push({ feature: 'Plane', x: dx * width * .20, y: dy * depth * .30 });
+    }
+  }
+  return targets;
+}
+
 export function runInspection(machine, plan) {
   const blocked = inspectionBlocker(machine, plan);
   if (blocked) {
     machine.report(blocked);
     return null;
   }
-  const { x, y, width, depth, top } = workpiece;
-  const targets = [];
-  if (plan.features.point) targets.push({ feature: 'Point', x, y });
-  if (plan.features.plane) {
-    for (const [dx, dy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
-      targets.push({ feature: 'Plane', x: x + dx * width * .20, y: y + dy * depth * .30 });
-    }
-  }
+  const { x, y, top } = workpiece;
+  const targets = inspectionTargets(plan.features).map(point => ({ ...point, x: x + point.x, y: y + point.y }));
   const run = { state: 'running', name: plan.name, count: targets.length, samples: [], checks: { ...plan.checks } };
   const clearance = top + plan.clearance - machine.tipOffset;
   const contact = top - machine.tipOffset;

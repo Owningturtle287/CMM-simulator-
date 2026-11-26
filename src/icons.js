@@ -21,6 +21,17 @@ const paths = {
   cross: '<path d="M6 6l12 12M18 6 6 18"/>',
   mobile: '<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M17.5 11v2M6 9v6"/>',
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10h.01"/>',
+  document: '<path d="M6 3h8l4 4v14H6zM14 3v5h4m-9 4h6m-6 4h6"/>',
+  folder: '<path d="M3 7h7l2 2h9l-2 10H3zM3 7V5h7l2 2h7v2"/>',
+  save: '<path d="M4 4h14l2 2v14H4zM8 4v6h8V4M8 20v-6h8v6"/>',
+  plane: '<path d="m3 15 8-8 10 3-8 8zM8 15l8-7m-5 8 7-7"/>',
+  height: '<path d="M7 4v16m-3-3 3 3 3-3M4 7l3-3 3 3m4-3h7m-7 16h7m-7-8h4"/>',
+  range: '<path d="M5 7h14M5 17h14M12 8v8m-3-5 3-3 3 3m-6 2 3 3 3-3"/>',
+  top: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M12 7v10M7 12h10"/><circle cx="12" cy="12" r="3"/>',
+  play: '<path d="M7 4v16l13-8z"/>',
+  report: '<rect x="5" y="4" width="14" height="16" rx="2"/><path d="M8 16v-4m4 4V8m4 8v-6"/>',
+  tree: '<path d="M5 4v16m0-13h5m-5 5h13m-13 5h9"/><circle cx="13" cy="7" r="2"/><circle cx="20" cy="12" r="2"/><circle cx="16" cy="17" r="2"/>',
+  axes: '<path d="M5 19V4m-2 2 2-2 2 2M5 19h15m-2-2 2 2-2 2M5 19 16 8m-4 0h4v4"/>',
 };
 
 export function icon(name, extra = '') {
