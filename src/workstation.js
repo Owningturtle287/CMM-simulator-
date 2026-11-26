@@ -2,6 +2,7 @@ import { axes, ports, stylusLabel } from './machine.js';
 import { icon } from './icons.js';
 import { defaultPlan, inspectionBlocker, inspectionResults, practicePlan, runInspection, savedPlan } from './inspection.js';
 import { createInspectionView } from './inspection-view.js';
+import { formatMeasurement } from './calibration.js';
 
 const sections = {
   cmm: ['CMM', 'wrench'], plan: ['Measurement Plan', 'planSheet'],
@@ -71,7 +72,7 @@ export function workstationLayout() {
                   <i class="inspection-lamp" id="inspection-settings-lamp" aria-hidden="true"></i>
                   <span class="cmm-action-icon">${icon('machineSettings')}</span><span>CMM Settings</span>
                 </button>
-                <button type="button" class="cmm-action" id="open-cmm-stylus" aria-haspopup="dialog" aria-controls="stylus-dialog">
+                <button type="button" class="cmm-action" id="open-cmm-stylus" aria-haspopup="dialog" aria-controls="qualification-dialog">
                   <i class="inspection-lamp" id="inspection-stylus-lamp" aria-hidden="true"></i>
                   <span class="cmm-action-icon">${icon('stylusSettings')}</span>
                   <span>Stylus System<small id="inspection-stylus" aria-live="polite"></small></span>
@@ -371,9 +372,9 @@ export function setupWorkstation(machine, close, releaseInputs) {
       `${run.name} · ${run.state === 'running' ? 'Measuring' : run.state === 'complete' ? 'Complete' : 'Stopped'} · ${run.samples.length}/${run.count} samples`);
     const results = run ? inspectionResults(run) : [];
     query('#inspection-result-table').innerHTML = results.length ? `<table><thead><tr><th scope="col">Characteristic</th><th scope="col">Actual (mm)</th><th scope="col">Limit (mm)</th><th scope="col">Result</th></tr></thead>
-      <tbody>${results.map(item => `<tr><th scope="row">${item.name}</th><td>${item.value.toFixed(3)}</td><td>${item.limit}</td><td class="${item.pass ? 'result-pass' : 'result-fail'}">${item.pass ? 'Pass' : 'Fail'}</td></tr>`).join('')}</tbody></table>` : '';
+      <tbody>${results.map(item => `<tr><th scope="row">${item.name}</th><td>${formatMeasurement(item.value)}</td><td>${item.limit}</td><td class="${item.pass ? 'result-pass' : 'result-fail'}">${item.pass ? 'Pass' : 'Fail'}</td></tr>`).join('')}</tbody></table>` : '';
     query('#inspection-samples').innerHTML = run?.samples.length ? `<table><caption>Fixture coordinates (mm)</caption><thead><tr><th scope="col">Sample</th><th scope="col">X</th><th scope="col">Y</th><th scope="col">Z</th></tr></thead>
-      <tbody>${run.samples.map(sample => `<tr><th scope="row">${sample.feature}</th>${axes.map(a => `<td>${sample[a].toFixed(3)}</td>`).join('')}</tr>`).join('')}</tbody></table>` : '';
+      <tbody>${run.samples.map(sample => `<tr><th scope="row">${sample.feature}</th>${axes.map(a => `<td>${formatMeasurement(sample[a])}</td>`).join('')}</tr>`).join('')}</tbody></table>` : '';
     if (run?.state === 'complete' || run?.state === 'stopped') showResults(true);
   }
 
@@ -413,12 +414,12 @@ export function setupWorkstation(machine, close, releaseInputs) {
       if (machineState.dataset.state !== state) machineState.dataset.state = state;
       lamp(cmmTabLamp, state === 'ready' && !machine.loaded ? 'fault' : state);
       lamp(cmmSettingsLamp, state);
-      lamp(stylusLamp, machine.loaded ? 'ready' : 'fault');
+      lamp(stylusLamp, ['running', 'manual'].includes(machine.qualification?.state) ? 'motion' : machine.stylusQualification()?.passed ? 'ready' : 'fault');
       text(mountedStylus, machine.loaded ? stylusLabel(ports[machine.loaded - 1]) : 'No stylus mounted');
       if (settings.open) updateSettingsReadout();
       text(message, machine.plan || pane === 'cmm' ? machine.message : notice || blocker || 'Ready to run the measurement plan.');
       const tip = machine.tipPosition;
-      for (const position of positions) text(position, tip[position.dataset.inspectionAxis].toFixed(3));
+      for (const position of positions) text(position, formatMeasurement(tip[position.dataset.inspectionAxis]));
       runButton.disabled = Boolean(blocker);
       runButton.hidden = running;
       stop.hidden = !running;

@@ -1,12 +1,15 @@
 import './style.css';
 import './mobile-mode.css';
 import './workstation.css';
+import './qualification.css';
 import { Machine, axes, masterStylus, ports, stylusLabel, travel } from './machine.js';
 import { createScene } from './scene.js';
 import { Console } from './console.js';
 import { layout } from './layout.js';
 import { setupMobileMode } from './mobile-mode.js';
 import { setupWorkstation } from './workstation.js';
+import { setupQualification } from './qualification.js';
+import { formatMeasurement } from './calibration.js';
 
 document.querySelector('#app').innerHTML = layout();
 const $ = selector => document.querySelector(selector);
@@ -48,6 +51,8 @@ const elements = {
 let scene;
 let openingWorkstation = false;
 const workstation = setupWorkstation(machine, () => scene?.closeWorkstation(), releaseInputs);
+const qualification = setupQualification(machine, openStylusPicker,
+  () => $('#inspection-workstation').close(), releaseInputs);
 function openWorkstation() {
   if (openingWorkstation) return;
   releaseInputs();
@@ -158,7 +163,7 @@ function openStylusPicker() {
   releaseInputs();
   if (!stylusDialog.open) stylusDialog.showModal();
 }
-elements.workstationStylus.addEventListener('click', openStylusPicker);
+elements.workstationStylus.addEventListener('click', qualification.open);
 quickActions.addEventListener('change', () => {
   const action = quickActions.value;
   quickActions.value = '';
@@ -375,10 +380,11 @@ function updateConsoleDisplay(m, coordinates) {
 function updateUI() {
   const m = machine;
   workstation.update(scene?.paintWorkstation);
+  qualification.update();
   const coordinates = {};
   const tip = m.tipPosition;
   for (const axis of axes) {
-    const value = tip[axis].toFixed(3);
+    const value = formatMeasurement(tip[axis]);
     setText(elements.coordinates[axis], value);
     setText(elements.mobile[axis], value);
     coordinates[axis] = value;
@@ -388,7 +394,8 @@ function updateUI() {
   setText(elements.touchStop, m.stopped ? 'Release' : 'E-stop');
   setText(elements.touchSide, ['Front', 'Left', 'Rear', 'Right'][m.side]);
   setText(elements.frameLabel, m.position.y > travel.y ? 'REAR SERVICE TRAVEL' : 'MACHINE FRAME');
-  const settings = [m.mode, Boolean(m.plan), m.drives, m.stopped, Boolean(m.fault), m.loaded, m.manualTool, Boolean(m.dock), m.speed];
+  const manualQualification = m.qualification?.state === 'manual';
+  const settings = [m.mode, Boolean(m.plan), m.drives, m.stopped, Boolean(m.fault), m.loaded, m.manualTool, Boolean(m.dock), m.speed, manualQualification];
   if (!lastSettings || settings.some((value, index) => value !== lastSettings[index])) {
     lastSettings = settings;
     const port = ports[m.loaded - 1];
@@ -402,10 +409,10 @@ function updateUI() {
     elements.touchSpeedTrack.style.setProperty('--speed-override', `${m.speed}%`);
     elements.speedControls.forEach(input => { if (Number(input.value) !== m.speed) input.value = m.speed; });
     elements.dial.style.setProperty('--angle', `${-135 + 2.7 * m.speed}deg`);
-    const available = m.drives && !m.stopped && !m.plan && !m.fault && m.mode === 'AUTO';
-    select.disabled = quickActions.options[1].disabled = elements.workstationStylus.disabled = !available;
+    const available = m.drives && !m.stopped && !m.plan && !m.fault && !manualQualification && m.mode === 'AUTO';
+    select.disabled = quickActions.options[1].disabled = !available;
     quickActions.options[2].disabled = !available || m.manualTool === masterStylus.id;
-    quickActions.options[3].disabled = quickActions.options[3].hidden = !m.plan;
+    quickActions.options[3].disabled = quickActions.options[3].hidden = !m.plan && !manualQualification;
     for (const option of portOptions) {
       const id = Number(option.value);
       option.disabled = id === m.manualTool || (id === m.loaded && !m.dock);
@@ -433,14 +440,14 @@ function updateUI() {
     setText(elements.calibrationProgress, state === 'cancelled' ? `Cancelled · ${counts}` : counts);
     elements.calibrationCenter.hidden = !sphere;
     if (sphere) {
-      setText(elements.calibrationCenter, `Ø${sphere.diameter.toFixed(3)} mm · X ${sphere.x.toFixed(2)} · Y ${sphere.y.toFixed(2)} · Z ${sphere.z.toFixed(2)}`);
+      setText(elements.calibrationCenter, `Ø${formatMeasurement(sphere.diameter)} mm · X ${formatMeasurement(sphere.x)} · Y ${formatMeasurement(sphere.y)} · Z ${formatMeasurement(sphere.z)}`);
     }
   }
   if (m.points.length !== previousPoints) {
     elements.clear.hidden = m.points.length === 0;
     elements.points.innerHTML = m.points.length ? `<ol>${m.points.map((point, index) => `<li>
       <b>${m.points.length - index} · ${point.kind}${point.tool ? ` · P${point.tool}` : ''}</b>
-      <code>${axes.map(a => `${a.toUpperCase()} ${point[a].toFixed(3)}`).join('  ')}</code></li>`).join('')}</ol>` :
+      <code>${axes.map(a => `${a.toUpperCase()} ${formatMeasurement(point[a])}`).join('  ')}</code></li>`).join('')}</ol>` :
       '<p>Captured measurements and intermediate positions appear here.</p>';
     previousPoints = m.points.length;
   }

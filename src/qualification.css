@@ -1,0 +1,132 @@
+#qualification-dialog {
+  width: min(724px, calc(100% - 30px));
+  max-height: calc(100dvh - 28px);
+  padding: 0;
+  overflow: hidden;
+  border-radius: 10px;
+  border-color: #9fb2c3;
+  background: #f7fafc;
+  color: #20374f;
+}
+#qualification-dialog[open] {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+}
+.qualification-head, .qualification-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  background: #fff;
+}
+.qualification-head { border-bottom: 1px solid #d3e0ea; }
+.qualification-head h2 { font-size: clamp(15px, 2.5vw, 20px); }
+.qualification-head p { margin: 3px 0 0; font-size: 11px; color: #526a80; }
+.qualification-head .icon-button { width: 30px; height: 30px; font-size: 16px; }
+#qualification-dialog :is(button, input, select) { max-width: 100%; }
+#qualification-dialog button:not(.icon-button) {
+  min-height: 34px;
+  padding: 4px 7px;
+  border: 1px solid #b6c9da;
+  border-radius: 5px;
+  background: #f8fbfe;
+  color: #294861;
+  font-size: 12px;
+  font-weight: 700;
+}
+#qualification-dialog button:not(:disabled):hover { background: #e9f3fc; }
+.qualification-toolbar, .qualification-commands {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+}
+.qualification-toolbar {
+  padding: 6px 10px;
+  border-bottom: 1px solid #cddbe7;
+  background: #edf3f8;
+}
+.qualification-toolbar button { display: flex; align-items: center; justify-content: center; gap: 4px; }
+.qualification-toolbar svg { color: #266188; font-size: 15px; }
+.qualification-body { min-height: 0; overflow: auto; padding: 10px; }
+.qualification-setup, .qualification-parameters {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 7px;
+  margin-bottom: 7px;
+}
+.qualification-body label, .qualification-label { display: grid; gap: 3px; font-size: 11px; font-weight: 700; color: #405a72; }
+.qualification-body input, .qualification-body select, .qualification-mounted, .qualification-tip output {
+  width: 100%;
+  min-width: 0;
+  min-height: 31px;
+  padding: 3px 5px;
+  border: 1px solid #b9cbda;
+  border-radius: 5px;
+  background: #fff;
+  color: #20374f;
+  font-size: 16px;
+}
+.qualification-mounted {
+  display: flex;
+  align-items: center;
+  margin-top: 3px;
+  background: #eef3f8;
+  color: #284761;
+  font-size: 12px;
+}
+.qualification-tip { display: grid; grid-template-columns: minmax(0, 1fr) 2.25em; gap: 3px; }
+.qualification-tip output { display: grid; place-items: center; background: #edf3f8; font: 700 12px var(--mono); }
+.qualification-parameters { align-items: end; padding: 6px; border: 1px solid #d7e3ec; border-radius: 5px; background: #f0f5fa; }
+.qualification-commands { margin-bottom: 8px; }
+#qualification-dialog #qual-run:not(:disabled) { background: #1c6693; border-color: #14577f; color: #fff; }
+#qualification-dialog #qual-run:not(:disabled):hover { background: #17577e; }
+#qualification-dialog #qual-cancel { color: #952e48; border-color: #dab9c2; }
+.qualification-results { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.qualification-card { min-width: 0; padding: 7px; border: 1px solid #ccdbe7; border-radius: 7px; background: #fff; }
+.qualification-card h3 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px; margin: 0 0 3px; font-size: 14px; }
+.qualification-card h3 small { color: #587086; font-weight: 600; font-size: 10px; }
+.qualification-card p { margin: 4px 0; color: #596f82; font-size: 11px; }
+#qual-result-state[data-status=pass] { color: #18674b; font-weight: 700; }
+#qual-result-state[data-status=fail] { color: #982d45; font-weight: 700; }
+.qualification-readout { display: grid; gap: 1px; margin: 0; }
+.qualification-readout > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px;
+  min-height: 21px;
+  padding: 2px 3px;
+  border-bottom: 1px solid #ebf0f5;
+}
+.qualification-readout dt { color: #496279; font-size: 11px; font-weight: 600; }
+.qualification-readout dd { margin: 0; color: #1d3b57; text-align: right; font: 650 11px var(--mono); }
+.qualification-footer { border-top: 1px solid #d3e0ea; }
+#qual-message { font-size: 12px; line-height: 1.25; color: #3f5870; }
+#qual-done { min-width: 56px; }
+
+@media (max-height: 500px) and (orientation: landscape) {
+  #qualification-dialog {
+    position: fixed;
+    inset: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right))
+      max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+    width: min(724px, calc(100% - max(8px, env(safe-area-inset-left)) - max(8px, env(safe-area-inset-right))));
+    max-height: calc(100dvh - max(8px, env(safe-area-inset-top)) - max(8px, env(safe-area-inset-bottom)));
+  }
+  .qualification-head, .qualification-footer { padding: 4px 8px; }
+  .qualification-toolbar { padding: 4px 7px; }
+  #qualification-dialog button:not(.icon-button) { min-height: 28px; }
+  .qualification-body { padding: 6px; }
+  #qual-message { font-size: 11px; }
+}
+@media (max-width: 520px) {
+  .qualification-setup, .qualification-parameters { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; }
+  .qualification-readout > div { gap: 3px; }
+  .qualification-readout dt, .qualification-readout dd { font-size: 10px; }
+  #qualification-dialog button:not(.icon-button) { padding-inline: 5px; font-size: 11px; }
+  .qualification-toolbar { gap: 3px; padding-inline: 5px; }
+}
+@media (max-width: 520px) and (orientation: portrait) {
+  #qualification-dialog { width: calc(100% - 12px); }
+}

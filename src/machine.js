@@ -1,4 +1,4 @@
-import { fitReferenceSphere, masterQualificationSteps, referenceSphere } from './calibration.js';
+import { demonstrationScans, fitSphere, qualificationModes, qualificationSteps, sphereOrientations, systemStyli, tensorScans } from './calibration.js';
 
 export const axes = ['x', 'y', 'z'];
 export const travel = { x: 900, y: 1200, z: 800 };
@@ -76,6 +76,15 @@ export class Machine {
   dock = null;
   fault = '';
   calibration = null;
+  sphereNumber = 1;
+  sphereRecords = {};
+  stylusQualifications = {};
+  qualification = null;
+  qualificationLimits = { sigma: .005, radiusError: .05 };
+
+  get referenceSphere() {
+    return sphereOrientations[this.sphereNumber - 1];
+  }
 
   get tipOffset() {
     return stylusLength - (ports[this.loaded - 1]?.length ?? stylusLength);
@@ -143,8 +152,9 @@ export class Machine {
   }
 
   abort() {
-    if (!this.plan) return false;
-    if (this.plan.calibrating) this.calibration.state = 'cancelled';
+    if (!this.plan && this.qualification?.state !== 'manual') return false;
+    if (this.plan?.calibrating) this.calibration.state = 'cancelled';
+    if (['running', 'manual'].includes(this.qualification?.state)) this.qualification.state = 'cancelled';
     this.plan = null;
     this.touching = false;
     this.clearVelocity();
@@ -155,6 +165,7 @@ export class Machine {
   canStart() {
     if (!this.drives || this.stopped) return this.report('Enable the drives before automatic travel.');
     if (this.plan) return this.report('Automatic travel is already in progress.');
+    if (this.qualification?.state === 'manual') return this.report('Finish or cancel the manual qualification first.');
     if (this.fault) return this.report('Clear the collision using SLOW and jog away.');
     return true;
   }
@@ -179,18 +190,156 @@ export class Machine {
     if (!this.canSelectStylus(masterStylus.id)) return false;
     const contacts = [];
     const calibration = { state: 'running', contacts: 0, scans: 0, sphere: null };
+    const sphere = this.referenceSphere;
+    const tipOffset = stylusLength - masterStylus.length;
     const steps = this.changeSteps(ports[masterStylus.id - 1]);
-    steps.push(
-      { goal: { x: referenceSphere.x, y: referenceSphere.y }, label: 'Travelling to the reference sphere' },
-      { goal: { z: referenceSphere.z + 85 }, label: 'Setting reference sphere clearance' },
-    );
-    steps.push(...masterQualificationSteps(masterStylus, stylusLength - masterStylus.length, () => {
-      contacts.push(this.tipPosition);
+    steps.push(...this.sphereApproach(sphere, tipOffset));
+    steps.push(...qualificationSteps(sphere, masterStylus, tipOffset, { locate: true, scans: demonstrationScans }, () => {
+      contacts.push({ ...this.position });
       calibration.contacts = contacts.length;
-      if (contacts.length === 5) calibration.sphere = fitReferenceSphere(contacts, masterStylus.diameter / 2);
+      if (contacts.length === 5) calibration.sphere = this.locatedSphere(sphere, contacts);
     }, () => { calibration.scans++; }));
+    steps.at(-1).action = () => {
+      this.sphereRecords[sphere.number] = calibration.sphere;
+      this.storeStylusQualification({ sphere, mode: 'dynamic', tip: 1, system: masterStylus.id, samples: contacts });
+    };
     this.calibration = calibration;
     return this.startPlan(steps, 'Master probe calibration complete.', true);
+  }
+
+  setSphereOrientation(number) {
+    if (!sphereOrientations[number - 1]) return this.report('Select one of the four reference sphere positions.');
+    if (number === this.sphereNumber) return true;
+    if (this.plan || this.qualification?.state === 'manual') return this.report('Finish or stop the current operation before rotating the sphere.');
+    const { pivot, z } = this.referenceSphere;
+    const tip = this.tipPosition;
+    if (Math.hypot(tip.x - pivot.x, tip.y - pivot.y) < 100 && tip.z < z + 35) {
+      return this.report('Raise the probe clear of the reference fixture before rotating the sphere.');
+    }
+    this.sphereNumber = number;
+    this.report(`Reference sphere position ${number} selected.`);
+    return true;
+  }
+
+  stylusQualification(tip = this.mountedStylus) {
+    return this.stylusQualifications[`${this.loaded}:${tip}`];
+  }
+
+  selectStylusTip(tip) {
+    const match = systemStyli(ports[this.loaded - 1]).find(item => item.no === tip);
+    if (!match || this.plan || this.qualification?.state === 'manual') return false;
+    this.mountedStylus = tip;
+    this.report(`Stylus ${match.name} selected.`);
+    return true;
+  }
+
+  qualificationBlocker(mode, tip, locate = false) {
+    if (!this.drives || this.stopped) return 'Enable the drives before qualifying.';
+    if (this.mode !== 'AUTO') return 'Set the controller to AUTO to start qualification.';
+    if (this.plan) return 'Wait for the current automatic travel to finish.';
+    if (this.fault) return 'Clear the machine obstruction first.';
+    if (this.qualification?.state === 'manual') return 'Finish or cancel the manual qualification first.';
+    if (!this.loaded) return 'Mount a stylus system first.';
+    if (this.speed === 0) return 'Increase the speed override above 0%.';
+    if (locate) return this.loaded === masterStylus.id ? '' : 'Mount the MasterProbe to locate the reference sphere.';
+    if (tip !== this.mountedStylus) return 'Activate the selected stylus first.';
+    if (this.loaded === masterStylus.id && !this.sphereRecords[this.sphereNumber]) {
+      return 'Set and locate this reference sphere position before qualifying the MasterProbe.';
+    }
+    if (qualificationModes[mode]?.repeat && !this.stylusQualification(tip)?.passed) return 'First complete an initial qualification for this stylus.';
+    if (mode === 'dynamic-repeat' && !this.stylusQualification(tip)?.dynamic) return 'First complete a dynamic qualification for this stylus.';
+    return '';
+  }
+
+  sphereApproach(sphere, tipOffset = this.tipOffset) {
+    return [
+      { goal: { x: sphere.x, y: sphere.y }, label: 'Travelling to the reference sphere' },
+      { goal: { z: sphere.z + 75 - tipOffset }, label: 'Setting reference sphere clearance' },
+    ];
+  }
+
+  locatedSphere(sphere, samples) {
+    const fit = fitSphere(samples);
+    if (!fit) return null;
+    return { x: fit.x, y: fit.y, z: fit.z + stylusLength - masterStylus.length + masterStylus.diameter / 2,
+      diameter: sphere.diameter, sigma: fit.sigma, at: Date.now() };
+  }
+
+  startSphereLocation() {
+    const blocked = this.qualificationBlocker('tensor', 1, true);
+    if (blocked) return this.report(blocked);
+    const sphere = this.referenceSphere;
+    const run = { kind: 'sphere', state: 'running', sphere, touches: 5, scans: 0, scanTotal: 0, samples: [] };
+    const steps = [...this.clearanceSteps(), ...this.sphereApproach(sphere),
+      ...qualificationSteps(sphere, masterStylus, this.tipOffset, { locate: true }, () => run.samples.push({ ...this.position }))];
+    steps.at(-1).action = () => {
+      const located = this.locatedSphere(sphere, run.samples);
+      if (!located) {
+        run.state = 'failed';
+        this.plan.finish = 'The reference sphere position could not be fit. Retry location.';
+        return;
+      }
+      this.sphereRecords[sphere.number] = located;
+      run.state = 'complete';
+    };
+    this.qualification = run;
+    return this.startPlan(steps, 'Reference sphere position located.');
+  }
+
+  startStylusQualification({ mode, tip, coverage, dynamics, force }) {
+    const blocked = this.qualificationBlocker(mode, tip);
+    if (blocked) return this.report(blocked);
+    const type = qualificationModes[mode];
+    if (!type || !(coverage >= 60 && coverage <= 180) || !(dynamics >= 10 && dynamics <= 100) || !(force >= 50 && force <= 400)) {
+      return this.report('Enter valid qualification parameters.');
+    }
+    const sphere = this.referenceSphere;
+    const scans = type.dynamic ? tensorScans() : [];
+    const run = { kind: 'stylus', state: 'running', sphere, mode, tip, system: this.loaded, touches: type.touches ?? 5,
+      scans: 0, scanTotal: scans.length, samples: [], dynamics, force, coverage };
+    const steps = [...this.clearanceSteps(), ...this.sphereApproach(sphere)];
+    this.qualification = run;
+    if (type.manual) {
+      steps.at(-1).action = () => { run.state = 'manual'; };
+      return this.startPlan(steps, 'Jog to the sphere and record touches with M-Point.');
+    }
+    steps.push(...qualificationSteps(sphere, ports[this.loaded - 1], this.tipOffset, { touches: run.touches, coverage, dynamics, scans },
+      () => run.samples.push({ ...this.position }), () => { run.scans++; }));
+    steps.at(-1).action = () => {
+      if (!this.storeStylusQualification(run)) {
+        run.state = 'failed';
+        this.plan.finish = 'The stylus ball could not be fit. Retry qualification.';
+      }
+    };
+    return this.startPlan(steps, 'Stylus qualification complete.');
+  }
+
+  finishManualQualification() {
+    const run = this.qualification;
+    if (run?.state !== 'manual') return false;
+    if (!this.storeStylusQualification(run)) {
+      return this.report('Collect at least four distinct touches at different heights around the sphere.');
+    }
+    this.report('Manual qualification complete.');
+    return true;
+  }
+
+  storeStylusQualification(run) {
+    const fitted = fitSphere(run.samples);
+    if (!fitted) return false;
+    const sphere = this.sphereRecords[run.sphere.number] ?? run.sphere;
+    const radius = fitted.radius - run.sphere.radius;
+    const nominal = ports[run.system - 1].diameter / 2;
+    const masterCenterOffset = stylusLength - masterStylus.length + masterStylus.diameter / 2;
+    const result = {
+      radius, sigma: fitted.sigma, x: sphere.x - fitted.x, y: sphere.y - fitted.y, z: sphere.z - fitted.z - masterCenterOffset,
+      at: Date.now(), mode: run.mode, dynamic: Boolean(qualificationModes[run.mode]?.dynamic),
+      passed: radius > 0 && fitted.sigma <= this.qualificationLimits.sigma + 1e-9 &&
+        Math.abs(radius - nominal) <= this.qualificationLimits.radiusError + 1e-9,
+    };
+    this.stylusQualifications[`${run.system}:${run.tip}`] = result;
+    run.state = 'complete';
+    return true;
   }
 
   changeSteps(target) {
@@ -257,6 +406,7 @@ export class Machine {
 
   manualStylus(mount) {
     if (this.plan || this.dock) return this.report('Clear the rack before handling a stylus.');
+    if (this.qualification?.state === 'manual') return this.report('Finish or cancel the manual qualification before handling a stylus.');
     if (mount && !this.loaded && this.manualTool) {
       if (this.position.z + stylusLength < ports[this.manualTool - 1].length) {
         return this.report('Raise Z before mounting the stylus system.');
@@ -277,6 +427,17 @@ export class Machine {
   recordPoint(kind) {
     if (this.plan || this.stopped || this.fault || !this.drives) return this.report('Point recording is unavailable in the current machine state.');
     if (kind === 'Measurement' && !this.loaded) return this.report('Mount a stylus before recording a point.');
+    if (kind === 'Measurement' && this.qualification?.state === 'manual') {
+      const run = this.qualification;
+      const ruby = ports[this.loaded - 1].diameter / 2;
+      const point = this.tipPosition;
+      const surface = Math.hypot(point.x - run.sphere.x, point.y - run.sphere.y, point.z + ruby - run.sphere.z);
+      if (Math.abs(surface - run.sphere.radius - ruby) > .05) return this.report('Touch the reference sphere before recording a qualification point.');
+      if (run.samples.some(sample => Math.hypot(sample.x - this.position.x, sample.y - this.position.y, sample.z - this.position.z) < .1)) {
+        return this.report('Move to another spot on the sphere before recording.');
+      }
+      run.samples.push({ ...this.position });
+    }
     this.points.unshift({ ...this.tipPosition, kind, tool: this.loaded });
     this.report(`${kind} point recorded.`);
     return true;
@@ -307,9 +468,10 @@ export class Machine {
       const length = 2 * Math.PI * circle.radius;
       circle.distance = Math.min(length, circle.distance + rate * seconds);
       const angle = circle.direction * circle.distance / circle.radius;
-      this.position.x = circle.x + circle.radius * Math.cos(angle);
-      this.position.y = circle.y + circle.radius * Math.sin(angle);
-      this.position.z = circle.z;
+      const a = circle.radius * Math.cos(angle), b = circle.radius * Math.sin(angle);
+      this.position.x = circle.x + a * circle.u[0] + b * circle.v[0];
+      this.position.y = circle.y + a * circle.u[1] + b * circle.v[1];
+      this.position.z = circle.z + a * circle.u[2] + b * circle.v[2];
       this.touching = true;
       this.probing = true;
       if (circle.distance < length) return;
@@ -382,6 +544,7 @@ export class Machine {
     }
     const tipOffset = this.tipOffset;
     const stylus = ports[this.loaded - 1];
+    const referenceSphere = this.referenceSphere;
     const sphereRadius = referenceSphere.diameter / 2;
     const horizontal = Math.hypot(next.x - referenceSphere.x, next.y - referenceSphere.y);
     if (horizontal < sphereRadius + headHalf && next.z + stylusLength < referenceSphere.z + sphereRadius) {
@@ -402,10 +565,15 @@ export class Machine {
         this.touching = true;
         return;
       }
-      const hitsBase = horizontal < referenceSphere.baseRadius + rubyRadius && next.z + tipOffset < 18;
-      const hitsHolder = horizontal < 22 + rubyRadius && next.z + tipOffset < referenceSphere.z - sphereRadius;
+      const { pivot, axis, stem } = referenceSphere;
+      const fromPivot = [next.x - pivot.x, next.y - pivot.y, ballZ - pivot.z];
+      const along = clamp(fromPivot[0] * axis.x + fromPivot[1] * axis.y + fromPivot[2] * axis.z, 0, stem - sphereRadius);
+      const touchesStem = Math.hypot(fromPivot[0] - along * axis.x, fromPivot[1] - along * axis.y, fromPivot[2] - along * axis.z) < rubyRadius + 5;
+      const holderDistance = Math.hypot(next.x - pivot.x, next.y - pivot.y);
+      const hitsBase = holderDistance < referenceSphere.baseRadius + rubyRadius && next.z + tipOffset < 18;
+      const hitsHolder = holderDistance < 22 + rubyRadius && next.z + tipOffset < pivot.z + 12;
       const shaftInterference = horizontal < sphereRadius + stylus.shaftDiameter / 2 && ballZ < referenceSphere.z;
-      if (touchesSphere || hitsBase || hitsHolder || shaftInterference) {
+      if (touchesSphere || hitsBase || hitsHolder || touchesStem || shaftInterference) {
         this.fault = 'Reference sphere obstruction';
         this.report('Reference sphere obstruction. Select SLOW and jog away.');
         return;

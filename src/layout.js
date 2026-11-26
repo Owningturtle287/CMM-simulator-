@@ -1,6 +1,7 @@
 import { icon } from './icons.js';
 import { mobileConsole } from './mobile-console.js';
 import { workstationLayout } from './workstation.js';
+import { qualificationLayout } from './qualification.js';
 import { ports, stylusLabel, travel } from './machine.js';
 
 const logo = `${import.meta.env.BASE_URL}zeiss.svg`;
@@ -186,6 +187,7 @@ export function layout() {
     <footer><span>Independent simulator</span><label class="artifact-option"><input id="artifact" type="checkbox" checked> Show reference block</label></footer>
   </main>
   ${workstationLayout()}
+  ${qualificationLayout()}
   <dialog id="machine-info" aria-labelledby="machine-info-title">
     <div class="dialog-head">
       <h2 id="machine-info-title">Machine information</h2>

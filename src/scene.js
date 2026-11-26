@@ -538,23 +538,34 @@ function buildRack(scene, m, adapter) {
 }
 
 function buildReferenceSphere(scene, m, mark) {
-  const [x, y, z] = worldPosition({ ...referenceSphere, z: 0 });
-  const fixture = group(scene, x, y, z);
+  const [x, y, z] = worldPosition({ ...referenceSphere.pivot, z: 0 });
+  const base = group(scene, x, y, z);
+  base.name = 'Reference sphere pedestal';
   const black = m.referenceStand;
-  const radius = referenceSphere.diameter / 2000;
-  const center = referenceSphere.z / 1000;
-  cylinder(fixture, black, referenceSphere.baseRadius / 1000, 0.016, 0, 0.008, 0, 32);
-  cylinder(fixture, black, 0.037, 0.003, 0, 0.0175, 0, 32, 0.043);
-  cylinder(fixture, black, 0.020, 0.105, 0, 0.071, 0, 28);
-  cylinder(fixture, black, 0.0135, 0.015, 0, 0.131, 0, 24, 0.020);
-  addMesh(fixture, new THREE.SphereGeometry(0.020, 24, 16), black, 0, 0.150, 0);
-  transverseFastener(fixture, m.rubber, 0.0045, 0.001, 0, 0.150, 0.020);
-  cylinder(fixture, black, 0.009, 0.013, 0, 0.174, 0, 20, 0.012);
-  const neckTop = center - radius + 0.002;
-  cylinder(fixture, black, 0.0043, neckTop - 0.178, 0, (neckTop + 0.178) / 2, 0, 20, 0.009);
-  addMesh(fixture, new THREE.SphereGeometry(radius, 36, 24), m.referenceCeramic, 0, center, 0);
-  decal(fixture, mark, 0.016, 0.016, 0, 0.073, 0.0205);
-  return fixture;
+  const radius = referenceSphere.radius / 1000;
+  const pivot = referenceSphere.pivot.z / 1000;
+  const length = referenceSphere.stem / 1000;
+  cylinder(base, black, referenceSphere.baseRadius / 1000, 0.016, 0, 0.008, 0, 32);
+  cylinder(base, black, 0.037, 0.003, 0, 0.0175, 0, 32, 0.043);
+  cylinder(base, black, 0.020, pivot - 0.041, 0, (pivot - 0.003) / 2, 0, 28);
+  cylinder(base, black, 0.0135, 0.015, 0, pivot - 0.015, 0, 24, 0.020);
+  addMesh(base, new THREE.SphereGeometry(0.020, 24, 16), black, 0, pivot, 0);
+  transverseFastener(base, m.rubber, 0.0045, 0.001, 0, pivot, 0.020);
+  const head = group(base, 0, pivot, 0);
+  head.name = 'Reference sphere shaft';
+  cylinder(head, black, 0.009, 0.014, 0, 0.019, 0, 20, 0.012);
+  const neckTop = length - radius + 0.002;
+  cylinder(head, black, 0.0043, neckTop - 0.025, 0, (neckTop + 0.025) / 2, 0, 20, 0.009);
+  const ball = addMesh(head, new THREE.SphereGeometry(radius, 36, 24), m.referenceCeramic, 0, length, 0);
+  ball.name = 'Reference sphere ball';
+  decal(base, mark, 0.016, 0.016, 0, 0.073, 0.0205);
+  const up = new THREE.Vector3(0, 1, 0);
+  const direction = new THREE.Vector3();
+  function orient({ axis }) {
+    head.quaternion.setFromUnitVectors(up, direction.set(axis.x, axis.z, -axis.y));
+  }
+  orient(referenceSphere);
+  return { base, head, orient };
 }
 
 function buildArtifact(scene, m) {
@@ -798,7 +809,8 @@ export function createScene(container, onWorkstation) {
     batchOpaque(moving.ram, [moving.stylus]);
     batchOpaque(rackFrame);
     batchOpaque(artifact);
-    batchOpaque(reference);
+    batchOpaque(reference.base, [reference.head]);
+    batchOpaque(reference.head);
     for (const { cover } of stations) batchOpaque(cover);
   }
 
@@ -976,7 +988,7 @@ export function createScene(container, onWorkstation) {
   resize();
 
   let x, y, z, lastLoaded, lastHeld, lastArtifact, lastDock, lastOpening;
-  let lastTransfer, lastOffset;
+  let lastTransfer, lastOffset, lastSphereNumber = referenceSphere.number;
   let shadowPending = true, nextShadow = 0;
   return {
     setView,
@@ -988,6 +1000,11 @@ export function createScene(container, onWorkstation) {
     },
     render(machine, now) {
       const { loaded, manualTool, artifact: hasArtifact, dock } = machine;
+      if (lastSphereNumber !== machine.sphereNumber) {
+        reference.orient(machine.referenceSphere);
+        lastSphereNumber = machine.sphereNumber;
+        dirty = shadowPending = true;
+      }
       position = machine.position;
       const moved = x !== position.x || y !== position.y || z !== position.z;
       if (moved) {

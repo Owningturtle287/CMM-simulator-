@@ -1,4 +1,5 @@
 import { probingRate, workpiece } from './machine.js';
+import { formatMeasurement } from './calibration.js';
 
 export const defaultPlan = () => ({
   name: 'Untitled measurement plan', aligned: false, clearance: 30,
@@ -31,6 +32,7 @@ export function inspectionBlocker(machine, plan) {
   if (!machine.drives || machine.stopped) return 'Enable the drives to run the plan.';
   if (machine.mode !== 'AUTO') return 'Set the controller to AUTO.';
   if (machine.plan) return 'Wait for current automatic travel to finish.';
+  if (machine.qualification?.state === 'manual') return 'Finish or cancel the manual stylus qualification.';
   if (machine.fault) return 'Clear the machine obstruction before measuring.';
   if (!machine.loaded) return 'Mount a stylus system first.';
   if (machine.speed === 0) return 'Increase the speed override above 0%.';
@@ -91,10 +93,10 @@ export function inspectionResults(run) {
   const point = run.samples.find(sample => sample.feature === 'Point');
   const height = point ? point.z : planes.reduce((sum, z) => sum + z, 0) / planes.length;
   const results = [];
-  if (run.checks.height) results.push({ name: 'Top height', value: height, limit: `${workpiece.top.toFixed(3)} ± 0.050`, pass: Math.abs(height - workpiece.top) <= .05 });
+  if (run.checks.height) results.push({ name: 'Top height', value: height, limit: `${formatMeasurement(workpiece.top)} ± 0.050000`, pass: Math.abs(height - workpiece.top) <= .05 });
   if (run.checks.variation) {
     const value = Math.max(...planes) - Math.min(...planes);
-    results.push({ name: 'Sample Z range', value, limit: '≤ 0.050', pass: value <= .05 });
+    results.push({ name: 'Sample Z range', value, limit: '≤ 0.050000', pass: value <= .05 });
   }
   return results;
 }

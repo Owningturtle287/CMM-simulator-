@@ -5,7 +5,7 @@ const keyLetters = { 0: '+0', 1: '-,@', 2: 'abc', 3: 'def', 4: 'ghi', 5: 'jkl', 
 const display = (name, read) => ({ name, read });
 const item = (name, action) => ({ name, action });
 const menu = (name, children) => ({ name, children });
-const formatAxis = (value) => value.toFixed(3);
+const formatAxis = (value) => value.toFixed(6);
 
 export class Console {
   numeric = true;
@@ -32,7 +32,7 @@ export class Console {
           const tip = m.tipPosition;
           return axes.map(a => `${a.toUpperCase()}  ${formatAxis(tip[a])} mm`);
         }),
-        display('Velocity D18', () => axes.map(a => `${a.toUpperCase()}  ${m.velocity[a].toFixed(2)} mm/s`)),
+        display('Velocity D18', () => axes.map(a => `${a.toUpperCase()}  ${formatAxis(m.velocity[a])} mm/s`)),
         display('Status D16X', () => [m.drives ? 'DRIVES ON' : 'DRIVES OFF', m.plan ? 'CNC TRAVEL' : m.mode, m.fault || sides[m.side]]),
         display('Probe data', () => [m.loaded ? `System ${m.loaded} / stylus 1` : 'No stylus mounted', 'VAST XT gold', m.scan ? 'Scanning enabled' : 'Scanning disabled']),
         display('Scales', () => ['Machine frame', '+X right · +Y rear', '+Z up · mm']),
