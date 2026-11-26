@@ -27,8 +27,8 @@
   .mobile-mode-toggle { width: 34px; padding: 0; }
   .mobile-mode-toggle span { display: none; }
 }
-@media (max-width: 340px) {
-  .head-inner { gap: 5px; }
+@media (max-width: 420px) {
+  .head-inner { gap: 6px; }
   .tool-control > svg:first-child { display: none; }
 }
 
