@@ -143,6 +143,7 @@ export class Console {
     switch (key) {
       case 'unlock-left':
       case 'unlock-right': return m.unlock();
+      case 'lock-toggle': return m.locked ? m.unlock() : m.lock();
       case 'estop': return m.stopped ? m.releaseStop() : m.emergencyStop();
       case 'drives': return m.enableDrives();
       case 'side': return this.setSide((m.side + 1) % sides.length);

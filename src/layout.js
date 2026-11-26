@@ -1,4 +1,5 @@
 import { icon } from './icons.js';
+import { mobileConsole } from './mobile-console.js';
 import { ports, stylusLabel, travel } from './machine.js';
 
 const logo = `${import.meta.env.BASE_URL}zeiss.svg`;
@@ -95,6 +96,8 @@ export function layout() {
           </select>
           ${icon('chevron')}
         </label>
+        <button id="mobile-mode" class="mobile-mode-toggle" type="button" aria-label="Mobile Mode" aria-pressed="false" title="Mobile Mode">${icon('mobile')}<span>Mobile Mode</span></button>
+        <button class="icon-button machine-info-toggle" type="button" data-info aria-label="Machine information" title="Machine information">${icon('info')}</button>
         <button class="icon-button help" type="button" data-help aria-label="Simulator controls and help" title="Controls and help">${icon('help')}</button>
       </div>
     </div>
@@ -123,7 +126,7 @@ export function layout() {
             <button class="icon-button reset" data-reset aria-label="Reset camera" title="Reset camera">${icon('reset')}</button>
           </div>
         </div>
-        <div class="mobile-readout" aria-hidden="true">
+        <div class="mobile-readout" role="group" aria-label="Machine coordinates in millimeters">
           ${axes.map(a => `<span class="${a}"><b>${a.toUpperCase()}</b> <code id="mobile-${a}"></code></span>`).join('')}
         </div>
         <div class="stage-status"><span class="status-diode" id="machine-diode"></span><span id="message" aria-live="polite"></span><span class="stage-frame">MACHINE FRAME</span></div>
@@ -169,8 +172,16 @@ export function layout() {
       </div>
       ${console()}
     </section>
-    <footer><span>Independent simulator</span><label><input id="artifact" type="checkbox" checked> Show reference block</label></footer>
+    ${mobileConsole()}
+    <footer><span>Independent simulator</span><label class="artifact-option"><input id="artifact" type="checkbox" checked> Show reference block</label></footer>
   </main>
+  <dialog id="machine-info" aria-labelledby="machine-info-title">
+    <div class="dialog-head">
+      <h2 id="machine-info-title">Machine information</h2>
+      <button class="icon-button" type="button" data-close-info aria-label="Close machine information">${icon('cross')}</button>
+    </div>
+    <div id="machine-info-content"></div>
+  </dialog>
   <dialog id="stylus-dialog" aria-labelledby="stylus-dialog-title">
     <div class="dialog-head">
       <h2 id="stylus-dialog-title">Choose stylus system</h2>
@@ -185,6 +196,7 @@ export function layout() {
     <div class="dialog-head"><h2>Operating the simulator</h2><button type="button" class="icon-button" data-close aria-label="Close control guide">${icon('cross')}</button></div>
     <dl>
       <dt>Jog the machine</dt><dd>Hold and drag the right stick for X/Y and the left stick for Z. On desktop, use W/A/S/D and Q/E. Unlock either joystick after the console idles for a minute.</dd>
+      <dt>Mobile Mode</dt><dd>Turn on Mobile Mode and rotate to landscape. Hold XY and Z buttons to jog. Use Functions for F1–F12 and probe axes, and Keypad to navigate or enter text. E-stop stays within reach in every panel.</dd>
       <dt>Inspect the machine</dt><dd>Scroll over a spot or pinch around it to zoom. Double-click or double-tap a part to center it. Drag to orbit, or drag with the right mouse button or two fingers to pan.</dd>
       <dt>Machine coordinates</dt><dd>From the front, +X is right, +Y is away and +Z is up. Zero is at the front-left of the measuring area at granite height. The rear rack uses service travel beyond Y 1,200 mm.</dd>
       <dt>Change a stylus</dt><dd>With drives on and AUTO selected, open Quick Actions and choose Change stylus system. Each adapter slides into its socket from the front. The magnetic receiver releases the old plate and slides the selected plate out. Each system has a single downward tip.</dd>

@@ -21,6 +21,7 @@ The **Deploy simulator to GitHub Pages** workflow tests and builds the app on pu
 
 ## Operation
 
+- **Mobile Mode** fits the machine and touch console side by side in phone landscape. Touch devices enable it by default, and the top bar toggle saves your preference. Use **Jog** for hold-to-move controls, **Functions** for console shortcuts and probe controls, and **Keypad** for menus and text. E-stop stays visible across all three panels. Open **Machine information** for the point log, calibration results and the reference block toggle.
 - Drag the right joystick for X and Y and the left joystick for Z. The desktop keys W/A/S/D and Q/E and the compact iPhone touch controls also jog the machine. The operating-position key rotates the X/Y assignment for the operator’s side.
 - Scroll or pinch over the spot you want to inspect. Double-click or double-tap a machine part to center it and zoom in. Drag to orbit, or use right-drag or two fingers to pan.
 - **M** toggles the drives. Pressing the mushroom latches the emergency stop immediately. Pressing it again simulates twisting it loose. The drives stay disabled until **M** is pressed. The joystick unlock buttons restore manual jogging after 60 seconds of inactivity.

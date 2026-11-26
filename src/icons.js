@@ -19,6 +19,7 @@ const paths = {
   stop: '<path d="m7 4-3 3v10l3 3h10l3-3V7l-3-3z"/><path d="M12 7v6m0 3h.01"/>',
   target: '<circle cx="12" cy="12" r="7"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/>',
   cross: '<path d="M6 6l12 12M18 6 6 18"/>',
+  mobile: '<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M17.5 11v2M6 9v6"/>',
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10h.01"/>',
 };
 

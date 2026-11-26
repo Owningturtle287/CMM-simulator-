@@ -1,8 +1,10 @@
 import './style.css';
-import { Machine, axes, masterStylus, ports, stylusLabel, travel } from './machine.js';
+import './mobile-mode.css';
+import { Machine, axes, masterStylus, orientJog, ports, stylusLabel, travel } from './machine.js';
 import { createScene } from './scene.js';
 import { Console } from './console.js';
 import { layout } from './layout.js';
+import { setupMobileMode } from './mobile-mode.js';
 
 document.querySelector('#app').innerHTML = layout();
 const $ = selector => document.querySelector(selector);
@@ -27,6 +29,12 @@ const elements = {
   dial: $('.dial'),
   lamps: $$('[data-lamp]'),
   lcd: $('#lcd'),
+  touchLcd: $('#mobile-lcd'),
+  touchSpeed: $('#touch-speed-value'),
+  touchLock: $('#touch-lock-label'),
+  touchStop: $('#touch-stop-label'),
+  touchSide: $('#touch-side-label'),
+  touchJog: $$('.touch-console [data-jog]'),
   points: $('#points'),
   clear: $('#clear-points'),
   calibration: $('#calibration-result'),
@@ -93,7 +101,7 @@ document.addEventListener('pointerdown', enableAudio, { once: true });
 document.addEventListener('keydown', enableAudio, { once: true });
 
 function command(key) {
-  if (['estop', 'drives', 'side', 'esc'].includes(key)) releaseInputs();
+  if (['estop', 'drives', 'side', 'esc', 'lock-toggle'].includes(key)) releaseInputs();
   const result = controller.press(key);
   if (result && (key === 'point' || key === 'intermediate')) tone(710);
   updateUI();
@@ -242,7 +250,7 @@ $$('[data-jog]').forEach(button => {
 });
 
 document.addEventListener('keydown', event => {
-  if (event.metaKey || event.altKey || event.ctrlKey || dialog.open || stylusDialog.open) return;
+  if (event.metaKey || event.altKey || event.ctrlKey || document.querySelector('dialog[open]')) return;
   if (event.key === 'Escape' && machine.plan) {
     event.preventDefault();
     command('esc');
@@ -303,6 +311,7 @@ const setText = (element, text) => {
 const pressed = {
   estop: () => machine.stopped, drives: () => machine.drives, slow: () => machine.slow,
   shift: () => controller.shift, return: () => controller.extended, num: () => controller.numeric,
+  'lock-toggle': () => machine.locked,
   insert: () => controller.replace, x: () => machine.clamps.x, y: () => machine.clamps.y, z: () => machine.clamps.z,
 };
 const keyStates = $$('[data-key]').filter(button => button.dataset.key in pressed);
@@ -314,17 +323,26 @@ let previousPoints = -1;
 let previousTouch = false;
 let previousFault = '';
 let previousLock = false;
+let previousSide;
+let activeLcd;
 function updateConsoleDisplay(m, coordinates) {
+  const lcd = document.documentElement.hasAttribute('data-mobile-layout') ? elements.touchLcd : elements.lcd;
+  if (lcd.hidden) return;
+  if (activeLcd !== lcd) {
+    activeLcd = lcd;
+    previousMenu = undefined;
+    positionDisplay = null;
+  }
   const menu = controller.menuDisplay();
   if (menu !== null) {
-    if (menu !== previousMenu) elements.lcd.innerHTML = menu;
+    if (menu !== previousMenu) lcd.innerHTML = menu;
     previousMenu = menu;
     positionDisplay = null;
     return;
   }
   if (!positionDisplay) {
-    elements.lcd.innerHTML = controller.defaultDisplay();
-    positionDisplay = Object.fromEntries([...elements.lcd.querySelectorAll('[data-lcd]')]
+    lcd.innerHTML = controller.defaultDisplay();
+    positionDisplay = Object.fromEntries([...lcd.querySelectorAll('[data-lcd]')]
       .map(node => [node.dataset.lcd, node]));
     previousMenu = null;
   }
@@ -344,6 +362,22 @@ function updateUI() {
     coordinates[axis] = value;
   }
   setText(elements.message, m.message);
+  setText(elements.touchLock, m.locked ? 'Unlock' : 'Lock jog');
+  setText(elements.touchStop, m.stopped ? 'Release' : 'E-stop');
+  if (m.side !== previousSide) {
+    previousSide = m.side;
+    setText(elements.touchSide, ['Front', 'Left', 'Rear', 'Right'][m.side]);
+    for (const button of elements.touchJog) {
+      const [axis, amount] = button.dataset.jog.split(',');
+      const motion = orientJog({ [axis]: Number(amount) }, m.side);
+      const machineAxis = axes.find(axis => motion[axis]);
+      const positive = motion[machineAxis] > 0;
+      const label = `Jog ${positive ? 'positive' : 'negative'} ${machineAxis.toUpperCase()}`;
+      setText(button, `${machineAxis.toUpperCase()}${positive ? '+' : '−'}`);
+      button.setAttribute('aria-label', label);
+      button.title = label;
+    }
+  }
   setText(elements.frameLabel, m.position.y > travel.y ? 'REAR SERVICE TRAVEL' : 'MACHINE FRAME');
   const settings = [m.mode, Boolean(m.plan), m.drives, m.stopped, Boolean(m.fault), m.loaded, m.manualTool, Boolean(m.dock), m.speed];
   if (!lastSettings || settings.some((value, index) => value !== lastSettings[index])) {
@@ -355,6 +389,7 @@ function updateUI() {
     elements.diode.dataset.state = m.stopped || m.fault ? 'error' : m.plan ? 'busy' : m.drives ? 'ready' : 'off';
     setText(elements.stylus, port ? stylusLabel(port) : 'Unloaded');
     setText(elements.speed, `${m.speed}%`);
+    setText(elements.touchSpeed, `${m.speed}%`);
     elements.speedControls.forEach(input => { if (Number(input.value) !== m.speed) input.value = m.speed; });
     elements.dial.style.setProperty('--angle', `${-135 + 2.7 * m.speed}deg`);
     const available = m.drives && !m.stopped && !m.plan && !m.fault && m.mode === 'AUTO';
@@ -408,6 +443,7 @@ function updateUI() {
 
 let lastFrame = performance.now();
 let lastUI = 0;
+setupMobileMode(releaseInputs);
 function frame(now) {
   const seconds = Math.max(0, Math.min(0.50, (now - lastFrame) / 1000));
   lastFrame = now;
